@@ -1,0 +1,4 @@
+v3:
+* Changed IP addresses to convention.
+* Removed tc flags.
+* Re-arranged the script's flow.
