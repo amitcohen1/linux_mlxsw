@@ -1,0 +1,4 @@
+v5:
+* Changed error messages to be more relevant.
+* Used the add and del filter according to convention.
+* Wrapped commit message at 75  columns.
