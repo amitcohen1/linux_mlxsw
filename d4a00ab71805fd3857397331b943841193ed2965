@@ -1,0 +1,3 @@
+v2: * Changed the flow of the test to and split it into smaller tests.
+    * Renamed some variables.
+    * Added a global dictionary for max capacity per asic type.
