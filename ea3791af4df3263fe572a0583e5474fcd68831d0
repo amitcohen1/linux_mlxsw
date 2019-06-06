@@ -1,3 +1,7 @@
+v2: * Changed the flow of the test to and split it into smaller tests.
+    * Renamed some variables.
+    * Added a global dictionary for max capacity per asic type.
+
 v3: * Added a case for testing.
     * Changed array of devnames to be array of named tuples.
     * Changed global dictionary of max capacity per port to be class with
