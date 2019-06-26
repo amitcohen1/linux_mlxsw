@@ -1,0 +1,13 @@
+v4: * Changed some variables' names.
+    * Edited some comments.
+    * Edited names to be consistence.
+
+v3: * Added a case for testing.
+    * Changed array of devnames to be array of named tuples.
+    * Changed global dictionary of max capacity per port to be class with
+      attribute.
+    * Removed the initialization of the attributes in the machine_info class.
+
+v2: * Changed the flow of the test to and split it into smaller tests.
+    * Renamed some variables.
+    * Added a global dictionary for max capacity per asic type.
