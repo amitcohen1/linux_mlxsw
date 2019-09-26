@@ -1,0 +1,4 @@
+v2: * Edit commit message.
+    * Unregister kvd when span registration fails.
+    * Rename resource id.
+    * Change mlxsw_sp_span_occ_get to static.
