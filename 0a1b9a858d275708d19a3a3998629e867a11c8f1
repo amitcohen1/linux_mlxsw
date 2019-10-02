@@ -1,0 +1,7 @@
+v3: * Edit commit message.
+    * Move mlxsw_sp_resources_span_register to spectrum.c
+
+v2: * Edit commit message.
+    * Unregister kvd when span registration fails.
+    * Rename resource id.
+    * Change mlxsw_sp_span_occ_get to static.
