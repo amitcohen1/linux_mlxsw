@@ -1,0 +1,5 @@
+v3: * Split commits for spectrum and spectrum-2.
+    * Remove SoB.
+    * Change resource name to correct one.
+
+v2: * Merge two commits.
