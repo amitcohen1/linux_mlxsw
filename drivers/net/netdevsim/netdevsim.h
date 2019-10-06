@@ -18,6 +18,7 @@
 #include <linux/list.h>
 #include <linux/netdevice.h>
 #include <linux/u64_stats_sync.h>
+#include <linux/debugfs.h>
 #include <net/devlink.h>
 #include <net/xdp.h>
 
@@ -134,6 +135,18 @@ enum nsim_resource_id {
 	NSIM_RESOURCE_IPV6_FIB_RULES,
 };
 
+struct nsim_dev_health {
+	struct devlink_health_reporter *empty_reporter;
+	struct devlink_health_reporter *dummy_reporter;
+	struct dentry *ddir;
+	char *recovered_break_msg;
+	u32 binary_len;
+	bool fail_recover;
+};
+
+int nsim_dev_health_init(struct nsim_dev *nsim_dev, struct devlink *devlink);
+void nsim_dev_health_exit(struct nsim_dev *nsim_dev);
+
 struct nsim_dev_port {
 	struct list_head list;
 	struct devlink_port devlink_port;
@@ -164,6 +177,7 @@ struct nsim_dev {
 	bool dont_allow_reload;
 	bool fail_reload;
 	struct devlink_region *dummy_region;
+	struct nsim_dev_health health;
 };
 
 static inline struct net *nsim_dev_net(struct nsim_dev *nsim_dev)
