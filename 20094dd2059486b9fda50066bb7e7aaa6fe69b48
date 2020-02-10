@@ -1,0 +1,6 @@
+v4: *Edit commit message.
+
+v3: *Pass the command not as string, but as individual words.
+
+v2: *Move wait for offload to general lib so it can be used with more tests.
+    *Fix the way the function is being called.
