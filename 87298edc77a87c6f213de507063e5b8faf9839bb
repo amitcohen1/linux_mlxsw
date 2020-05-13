@@ -1,0 +1,6 @@
+v2: *Change class name and some variable names.
+    *Add a script parameter for devlink handle.
+    *Handle zero-width situation.
+    *Reword commit message and function docs.
+    *Turn a class function to a global function.
+    *Remove unnecessary sleep.
