@@ -1,0 +1,6 @@
+v2: *Reword commit message and some function docs.
+    *Turn a class function to a static method.
+    *Change the class name and some variable names.
+    *Add a test parameter for devlink handle.
+    *Remove unnecessary sleep.
+    *Improve some functions.
