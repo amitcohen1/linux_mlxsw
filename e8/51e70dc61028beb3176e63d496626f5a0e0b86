@@ -1,4 +1,4 @@
-v8: *Change attribute name from width to lanes.
+v6: *Change attribute name from width to lanes.
 
 v5: *Fix a bug involves the dev parameter.
 
