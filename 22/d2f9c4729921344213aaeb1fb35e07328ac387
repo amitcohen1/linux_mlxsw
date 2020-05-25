@@ -1,4 +1,4 @@
-v8: *Change attribute name from width to lanes.
+v5: *Change attribute name from width to lanes.
 
 v4: *Reword a commit message and a function doc.
 
