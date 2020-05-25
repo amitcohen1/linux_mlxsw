@@ -1,0 +1,17 @@
+v8: *Change attribute name from width to lanes.
+
+v5: *Fix a bug involves the dev parameter.
+
+v4: *Reword some function docs.
+    *Handle an unknown device.
+    *Replace sleep with udevadm settle.
+
+v3: *Rename test, change its location and adjust Makefile.
+
+v2: *Reword commit message and some function docs.
+    *Turn a class function to a static method.
+    *Change the class name and some variable names.
+    *Add a test parameter for devlink handle.
+    *Remove unnecessary sleep.
+    *Improve some functions.
+    *Handle a zero-width situation.
