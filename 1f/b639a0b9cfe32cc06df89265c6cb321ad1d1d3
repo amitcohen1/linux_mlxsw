@@ -1,0 +1,4 @@
+v3: *Change splittable to bool.
+    *Add splittable_valid attr to driver.
+
+v2: *Move splittable to be indicated in driver.
