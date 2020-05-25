@@ -1,0 +1,5 @@
+v8: *Change attribute name from width to lanes.
+
+v3: *Reword commit message.
+
+v2: *Fix a compilation issue in the patch.
