@@ -1,3 +1,5 @@
+v5: *Reword commit message.
+
 v4: *Set splittable for nfp driver.
 
 v3: *Remove splittable_valid attr.
