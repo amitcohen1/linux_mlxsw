@@ -1,3 +1,5 @@
+v6: *Reword commit message.
+
 v5: *Arange variable declarations.
 
 v4: *Remove splittable_valid attr from driver.
