@@ -1,3 +1,5 @@
+v5: *Remove check for a non-null variable.
+
 v4: *Remove init to 0 fields that are already zeroed.
 
 v3: *Add switch_id and len to attrs.
