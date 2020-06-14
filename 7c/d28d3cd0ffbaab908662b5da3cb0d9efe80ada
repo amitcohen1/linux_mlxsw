@@ -1,3 +1,4 @@
+v6: *Reword function description to avoid warnings.
 v5: *Remove check for a non-null variable.
 
 v4: *Remove init to 0 fields that are already zeroed.
