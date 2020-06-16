@@ -1,0 +1,10 @@
+v6: *Reword commit message.
+
+v5: *Arange variable declarations.
+
+v4: *Remove splittable_valid attr from driver.
+
+v3: *Change splittable to bool.
+    *Add splittable_valid attr to driver.
+
+v2: *Move splittable to be indicated in driver
