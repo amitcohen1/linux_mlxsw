@@ -1,0 +1,12 @@
+v6: *Fix indentation.
+
+v5: *Change attribute name from width to lanes.
+
+v4: *Reword a commit message and a function doc.
+
+v3: *Reword commit message.
+    *Update the function docs.
+    *Adjust all the devlink_port_attrs_set() usages.
+
+v2: *Split the patchset into two- one for width and one for splittable
+     exposing.
