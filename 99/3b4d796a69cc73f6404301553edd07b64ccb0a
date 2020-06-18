@@ -1,1 +1,3 @@
+v18: *Move attrs setting to the beginning of the function and adjust.
+
 v17: *Add switch_id_len parameter to __devlink_port_attrs_set
