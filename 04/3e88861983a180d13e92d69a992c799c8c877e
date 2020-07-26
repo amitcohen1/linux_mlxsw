@@ -1,2 +1,4 @@
 v3: *Remove 100M speed from the driver, instead of changing its name
      and bit number.
+
+v3: *Exposing the new bit with the right ethtool mask.
