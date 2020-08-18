@@ -1,0 +1,8 @@
+v5: *Move "lanes" from ethtool_link_settings to ethtool_link_ksettings.
+
+v3: *Reword commit message.
+    *Merge two first patches into one.
+
+v2: *Add a "ETHTOOL_" prefix to "LANES".
+    *Move the constants to the end.
+    *Maintain 80cols limit in a comment.
