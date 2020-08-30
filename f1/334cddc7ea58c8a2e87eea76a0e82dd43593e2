@@ -1,0 +1,2 @@
+v2: *Add a "ETHTOOL_" prefix to "LANES".
+    *Move the constants to the end.
