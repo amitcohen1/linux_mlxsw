@@ -1,2 +1,5 @@
 v2: *Add a "ETHTOOL_" prefix to "LANES".
     *Move the constants to the end.
+
+v2: *Maintain 80cols limit in a comment.
+    *Move policy constants to the end.
