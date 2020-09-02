@@ -1,1 +1,4 @@
+v4: *Fix the condition for returning an error when lanes setting is not
+     supported.
+
 v3: *Fix the silent ignore when setting lanes in non-supporting driver.
