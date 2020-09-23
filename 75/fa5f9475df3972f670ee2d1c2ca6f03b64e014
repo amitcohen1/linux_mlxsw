@@ -1,3 +1,5 @@
+v9: *Add  validation for lanes parameter.
+
 v7: *Change the value of ETHTOOL_LANES_UNKNOWN to 0.
 
 v5: *Move "lanes" from ethtool_link_settings to ethtool_link_ksettings.
