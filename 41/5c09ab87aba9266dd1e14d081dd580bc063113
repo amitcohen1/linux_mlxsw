@@ -1,3 +1,7 @@
+v11: *Reword commit message.
+     *Use u32 instead of __u32 as lanes field.
+     *Reword comments.
+
 v10: *Merge patch #1 and #2.
      *Reword commit message.
      *Retrun error for not supporting lanes only when autoneg is off.
