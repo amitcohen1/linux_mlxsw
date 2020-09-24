@@ -1,6 +1,5 @@
 v10: *Merge patch #1 and #2.
      *Reword commit message.
-     *Reword function description.
      *Retrun error for not supporting lanes only when autoneg is off.
 
 v9: *Add  validation for lanes parameter.
