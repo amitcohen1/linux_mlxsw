@@ -1,3 +1,6 @@
+v11: *Reword commit message.
+     *Reverse xmas tree in 'ethnl_auto_linkmodes' function.
+
 v10: *Reword function description.
      *Change variable name.
      *Reword commit message.
