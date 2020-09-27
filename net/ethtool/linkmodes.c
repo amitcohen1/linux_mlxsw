@@ -293,24 +293,28 @@ linkmodes_set_policy[ETHTOOL_A_LINKMODES_MAX + 1] = {
 	[ETHTOOL_A_LINKMODES_LANES]		= { .type = NLA_U32 },
 };
 
-/* Set advertised link modes to all supported modes matching requested speed,
- * lanes and duplex values, if specified. Called when autonegotiation is on,
- * but no link mode change. This is done in userspace with ioctl() interface,
- * move it into kernel for netlink.
- * Returns true if advertised modes bitmap was modified.
+/* Set advertised or forced link modes to all supported modes matching
+ * requested speed, lanes and duplex values, if specified. Called when no link
+ * modes are specified. This is done in userspace with ioctl() interface, move
+ * it into kernel for netlink.
+ * Returns true if advertised or forced modes bitmap was modified.
  */
 static bool ethnl_auto_linkmodes(struct ethtool_link_ksettings *ksettings,
 				 bool req_speed, bool req_lanes, bool req_duplex)
 {
 	unsigned long *advertising = ksettings->link_modes.advertising;
 	unsigned long *supported = ksettings->link_modes.supported;
-	DECLARE_BITMAP(old_adv, __ETHTOOL_LINK_MODE_MASK_NBITS);
+	struct ethtool_link_settings *lsettings = &ksettings->base;
+	DECLARE_BITMAP(old_mask, __ETHTOOL_LINK_MODE_MASK_NBITS);
+	unsigned long *forcing = ksettings->link_modes.forcing;
+	unsigned long *bitmask;
 	unsigned int i;
 
 	BUILD_BUG_ON(ARRAY_SIZE(link_mode_params) !=
 		     __ETHTOOL_LINK_MODE_MASK_NBITS);
 
-	bitmap_copy(old_adv, advertising, __ETHTOOL_LINK_MODE_MASK_NBITS);
+	bitmask = lsettings->autoneg ? advertising : forcing;
+	bitmap_copy(old_mask, bitmask, __ETHTOOL_LINK_MODE_MASK_NBITS);
 
 	for (i = 0; i < __ETHTOOL_LINK_MODE_MASK_NBITS; i++) {
 		const struct link_mode_info *info = &link_mode_params[i];
@@ -321,13 +325,12 @@ static bool ethnl_auto_linkmodes(struct ethtool_link_ksettings *ksettings,
 		    (!req_speed || info->speed == ksettings->base.speed) &&
 		    (!req_lanes || info->lanes == ksettings->lanes) &&
 		    (!req_duplex || info->duplex == ksettings->base.duplex))
-			set_bit(i, advertising);
+			set_bit(i, bitmask);
 		else
-			clear_bit(i, advertising);
+			clear_bit(i, bitmask);
 	}
 
-	return !bitmap_equal(old_adv, advertising,
-			     __ETHTOOL_LINK_MODE_MASK_NBITS);
+	return !bitmap_equal(old_mask, bitmask, __ETHTOOL_LINK_MODE_MASK_NBITS);
 }
 
 static bool ethnl_validate_master_slave_cfg(u8 cfg)
@@ -426,7 +429,7 @@ static int ethnl_update_linkmodes(struct genl_info *info, struct nlattr **tb,
 			mod);
 	ethnl_update_u8(&lsettings->master_slave_cfg, master_slave_cfg, mod);
 
-	if (!tb[ETHTOOL_A_LINKMODES_OURS] && lsettings->autoneg &&
+	if (!tb[ETHTOOL_A_LINKMODES_OURS] &&
 	    ethnl_auto_linkmodes(ksettings, req_speed, req_lanes, req_duplex))
 		*mod = true;
 
