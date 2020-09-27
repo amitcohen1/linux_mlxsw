@@ -966,8 +966,8 @@ static int mlxsw_sp_port_get_link_ksettings(struct net_device *dev,
 
 	cmd->base.autoneg = autoneg ? AUTONEG_ENABLE : AUTONEG_DISABLE;
 	cmd->base.port = mlxsw_sp_port_connector_port(connector_type);
-	ops->from_ptys_speed_duplex(mlxsw_sp, netif_carrier_ok(dev),
-				    eth_proto_oper, cmd);
+	ops->from_ptys_speed_lanes_duplex(mlxsw_sp, netif_carrier_ok(dev),
+					  eth_proto_oper, cmd);
 
 	return 0;
 }
@@ -1221,11 +1221,12 @@ mlxsw_sp1_from_ptys_speed(struct mlxsw_sp *mlxsw_sp, u32 ptys_eth_proto)
 }
 
 static void
-mlxsw_sp1_from_ptys_speed_duplex(struct mlxsw_sp *mlxsw_sp, bool carrier_ok,
-				 u32 ptys_eth_proto,
-				 struct ethtool_link_ksettings *cmd)
+mlxsw_sp1_from_ptys_speed_lanes_duplex(struct mlxsw_sp *mlxsw_sp, bool carrier_ok,
+				       u32 ptys_eth_proto,
+				       struct ethtool_link_ksettings *cmd)
 {
 	cmd->base.speed = SPEED_UNKNOWN;
+	cmd->lanes = ETHTOOL_LANES_UNKNOWN;
 	cmd->base.duplex = DUPLEX_UNKNOWN;
 
 	if (!carrier_ok)
@@ -1307,7 +1308,7 @@ const struct mlxsw_sp_port_type_speed_ops mlxsw_sp1_port_type_speed_ops = {
 	.from_ptys_supported_port	= mlxsw_sp1_from_ptys_supported_port,
 	.from_ptys_link			= mlxsw_sp1_from_ptys_link,
 	.from_ptys_speed		= mlxsw_sp1_from_ptys_speed,
-	.from_ptys_speed_duplex		= mlxsw_sp1_from_ptys_speed_duplex,
+	.from_ptys_speed_lanes_duplex	= mlxsw_sp1_from_ptys_speed_lanes_duplex,
 	.ptys_max_speed			= mlxsw_sp1_ptys_max_speed,
 	.to_ptys_advert_link		= mlxsw_sp1_to_ptys_advert_link,
 	.to_ptys_force_link		= mlxsw_sp1_to_ptys_force_link,
@@ -1628,20 +1629,46 @@ mlxsw_sp2_from_ptys_speed(struct mlxsw_sp *mlxsw_sp, u32 ptys_eth_proto)
 	return SPEED_UNKNOWN;
 }
 
+static u32
+mlxsw_sp2_from_ptys_lanes(struct mlxsw_sp *mlxsw_sp, u32 ptys_eth_proto)
+{
+	u8 width;
+	int i;
+
+	for (i = 0; i < MLXSW_SP2_PORT_LINK_MODE_LEN; i++) {
+		if (ptys_eth_proto & mlxsw_sp2_port_link_mode[i].mask) {
+			width = mlxsw_sp2_port_link_mode[i].mask_width;
+			if (width & MLXSW_SP_PORT_MASK_WIDTH_1X)
+				return ETHTOOL_LANES_1;
+			else if (width & MLXSW_SP_PORT_MASK_WIDTH_2X)
+				return ETHTOOL_LANES_2;
+			else if (width & MLXSW_SP_PORT_MASK_WIDTH_4X)
+				return ETHTOOL_LANES_4;
+			else if (width & MLXSW_SP_PORT_MASK_WIDTH_8X)
+				return ETHTOOL_LANES_8;
+		}
+	}
+
+	return ETHTOOL_LANES_UNKNOWN;
+}
+
 static void
-mlxsw_sp2_from_ptys_speed_duplex(struct mlxsw_sp *mlxsw_sp, bool carrier_ok,
-				 u32 ptys_eth_proto,
-				 struct ethtool_link_ksettings *cmd)
+mlxsw_sp2_from_ptys_speed_lanes_duplex(struct mlxsw_sp *mlxsw_sp, bool carrier_ok,
+				       u32 ptys_eth_proto,
+				       struct ethtool_link_ksettings *cmd)
 {
 	cmd->base.speed = SPEED_UNKNOWN;
+	cmd->lanes = ETHTOOL_LANES_UNKNOWN;
 	cmd->base.duplex = DUPLEX_UNKNOWN;
 
 	if (!carrier_ok)
 		return;
 
 	cmd->base.speed = mlxsw_sp2_from_ptys_speed(mlxsw_sp, ptys_eth_proto);
-	if (cmd->base.speed != SPEED_UNKNOWN)
+	if (cmd->base.speed != SPEED_UNKNOWN) {
+		cmd->lanes = mlxsw_sp2_from_ptys_lanes(mlxsw_sp, ptys_eth_proto);
 		cmd->base.duplex = DUPLEX_FULL;
+	}
 }
 
 static int mlxsw_sp2_ptys_max_speed(struct mlxsw_sp_port *mlxsw_sp_port, u32 *p_max_speed)
@@ -1741,7 +1768,7 @@ const struct mlxsw_sp_port_type_speed_ops mlxsw_sp2_port_type_speed_ops = {
 	.from_ptys_supported_port	= mlxsw_sp2_from_ptys_supported_port,
 	.from_ptys_link			= mlxsw_sp2_from_ptys_link,
 	.from_ptys_speed		= mlxsw_sp2_from_ptys_speed,
-	.from_ptys_speed_duplex		= mlxsw_sp2_from_ptys_speed_duplex,
+	.from_ptys_speed_lanes_duplex	= mlxsw_sp2_from_ptys_speed_lanes_duplex,
 	.ptys_max_speed			= mlxsw_sp2_ptys_max_speed,
 	.to_ptys_advert_link		= mlxsw_sp2_to_ptys_advert_link,
 	.to_ptys_force_link		= mlxsw_sp2_to_ptys_force_link,
