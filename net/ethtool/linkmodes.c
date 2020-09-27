@@ -29,6 +29,7 @@ linkmodes_get_policy[ETHTOOL_A_LINKMODES_MAX + 1] = {
 	[ETHTOOL_A_LINKMODES_DUPLEX]		= { .type = NLA_REJECT },
 	[ETHTOOL_A_LINKMODES_MASTER_SLAVE_CFG]	= { .type = NLA_REJECT },
 	[ETHTOOL_A_LINKMODES_MASTER_SLAVE_STATE]	= { .type = NLA_REJECT },
+	[ETHTOOL_A_LINKMODES_LANES]		= { .type = NLA_REJECT },
 };
 
 static int linkmodes_prepare_data(const struct ethnl_req_info *req_base,
@@ -51,6 +52,9 @@ static int linkmodes_prepare_data(const struct ethnl_req_info *req_base,
 		goto out;
 	}
 
+	if (!(dev->ethtool_ops->capabilities & ETHTOOL_CAP_FORCE_LINK_LANES_SUPPORTED))
+		data->ksettings.lanes = ETHTOOL_LANES_UNKNOWN;
+
 	data->peer_empty =
 		bitmap_empty(data->ksettings.link_modes.lp_advertising,
 			     __ETHTOOL_LINK_MODE_MASK_NBITS);
@@ -71,6 +75,7 @@ static int linkmodes_reply_size(const struct ethnl_req_info *req_base,
 
 	len = nla_total_size(sizeof(u8)) /* LINKMODES_AUTONEG */
 		+ nla_total_size(sizeof(u32)) /* LINKMODES_SPEED */
+		+ nla_total_size(sizeof(u32)) /* LINKMODES_LANES */
 		+ nla_total_size(sizeof(u8)) /* LINKMODES_DUPLEX */
 		+ 0;
 	ret = ethnl_bitset_size(ksettings->link_modes.advertising,
@@ -128,6 +133,7 @@ static int linkmodes_fill_reply(struct sk_buff *skb,
 	}
 
 	if (nla_put_u32(skb, ETHTOOL_A_LINKMODES_SPEED, lsettings->speed) ||
+	    nla_put_u32(skb, ETHTOOL_A_LINKMODES_LANES, ksettings->lanes) ||
 	    nla_put_u8(skb, ETHTOOL_A_LINKMODES_DUPLEX, lsettings->duplex))
 		return -EMSGSIZE;
 
