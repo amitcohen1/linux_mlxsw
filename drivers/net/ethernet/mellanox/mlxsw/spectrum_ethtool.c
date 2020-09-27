@@ -996,8 +996,8 @@ mlxsw_sp_port_set_link_ksettings(struct net_device *dev,
 	autoneg = cmd->base.autoneg == AUTONEG_ENABLE;
 	eth_proto_new = autoneg ?
 		ops->to_ptys_advert_link(mlxsw_sp, cmd) :
-		ops->to_ptys_speed(mlxsw_sp, mlxsw_sp_port->mapping.width,
-				   cmd->base.speed);
+		ops->to_ptys_force_link(mlxsw_sp, mlxsw_sp_port->mapping.width,
+					cmd);
 
 	eth_proto_new = eth_proto_new & eth_proto_cap;
 	if (!eth_proto_new) {
@@ -1060,6 +1060,7 @@ mlxsw_sp_get_ts_info(struct net_device *netdev, struct ethtool_ts_info *info)
 }
 
 const struct ethtool_ops mlxsw_sp_port_ethtool_ops = {
+	.capabilities		= ETHTOOL_CAP_FORCE_LINK_LANES_SUPPORTED,
 	.get_drvinfo		= mlxsw_sp_port_get_drvinfo,
 	.get_link		= ethtool_op_get_link,
 	.get_link_ext_state	= mlxsw_sp_port_get_link_ext_state,
@@ -1271,14 +1272,16 @@ mlxsw_sp1_to_ptys_advert_link(struct mlxsw_sp *mlxsw_sp,
 	return ptys_proto;
 }
 
-static u32 mlxsw_sp1_to_ptys_speed(struct mlxsw_sp *mlxsw_sp, u8 width,
-				   u32 speed)
+static u32
+mlxsw_sp1_to_ptys_force_link(struct mlxsw_sp *mlxsw_sp, u8 width,
+			     const struct ethtool_link_ksettings *cmd)
 {
 	u32 ptys_proto = 0;
 	int i;
 
 	for (i = 0; i < MLXSW_SP1_PORT_LINK_MODE_LEN; i++) {
-		if (speed == mlxsw_sp1_port_link_mode[i].speed)
+		if (test_bit(mlxsw_sp1_port_link_mode[i].mask_ethtool,
+			     cmd->link_modes.forcing))
 			ptys_proto |= mlxsw_sp1_port_link_mode[i].mask;
 	}
 	return ptys_proto;
@@ -1307,7 +1310,7 @@ const struct mlxsw_sp_port_type_speed_ops mlxsw_sp1_port_type_speed_ops = {
 	.from_ptys_speed_duplex		= mlxsw_sp1_from_ptys_speed_duplex,
 	.ptys_max_speed			= mlxsw_sp1_ptys_max_speed,
 	.to_ptys_advert_link		= mlxsw_sp1_to_ptys_advert_link,
-	.to_ptys_speed			= mlxsw_sp1_to_ptys_speed,
+	.to_ptys_force_link		= mlxsw_sp1_to_ptys_force_link,
 	.reg_ptys_eth_pack		= mlxsw_sp1_reg_ptys_eth_pack,
 	.reg_ptys_eth_unpack		= mlxsw_sp1_reg_ptys_eth_unpack,
 };
@@ -1692,17 +1695,27 @@ mlxsw_sp2_to_ptys_advert_link(struct mlxsw_sp *mlxsw_sp,
 	return ptys_proto;
 }
 
-static u32 mlxsw_sp2_to_ptys_speed(struct mlxsw_sp *mlxsw_sp,
-				   u8 width, u32 speed)
+static u32
+mlxsw_sp2_to_ptys_force_link(struct mlxsw_sp *mlxsw_sp, u8 width,
+			     const struct ethtool_link_ksettings *cmd)
 {
 	u8 mask_width = mlxsw_sp_port_mask_width_get(width);
 	u32 ptys_proto = 0;
 	int i;
 
 	for (i = 0; i < MLXSW_SP2_PORT_LINK_MODE_LEN; i++) {
-		if ((speed == mlxsw_sp2_port_link_mode[i].speed) &&
-		    (mask_width & mlxsw_sp2_port_link_mode[i].mask_width))
-			ptys_proto |= mlxsw_sp2_port_link_mode[i].mask;
+		if (mlxsw_sp2_test_bit_ethtool(&mlxsw_sp2_port_link_mode[i],
+					       cmd->link_modes.forcing)) {
+			/* If number of lanes was not set by user space, force lanes to
+			 * be mask_width, so the number of lanes won't be negotiated.
+			 */
+			if (cmd->lanes == ETHTOOL_LANES_UNKNOWN) {
+				if (mask_width & mlxsw_sp2_port_link_mode[i].mask_width)
+					ptys_proto |= mlxsw_sp2_port_link_mode[i].mask;
+			} else {
+				ptys_proto |= mlxsw_sp2_port_link_mode[i].mask;
+			}
+		}
 	}
 	return ptys_proto;
 }
@@ -1731,7 +1744,7 @@ const struct mlxsw_sp_port_type_speed_ops mlxsw_sp2_port_type_speed_ops = {
 	.from_ptys_speed_duplex		= mlxsw_sp2_from_ptys_speed_duplex,
 	.ptys_max_speed			= mlxsw_sp2_ptys_max_speed,
 	.to_ptys_advert_link		= mlxsw_sp2_to_ptys_advert_link,
-	.to_ptys_speed			= mlxsw_sp2_to_ptys_speed,
+	.to_ptys_force_link		= mlxsw_sp2_to_ptys_force_link,
 	.reg_ptys_eth_pack		= mlxsw_sp2_reg_ptys_eth_pack,
 	.reg_ptys_eth_unpack		= mlxsw_sp2_reg_ptys_eth_unpack,
 };
