@@ -1738,6 +1738,14 @@ static inline int ethtool_validate_speed(__u32 speed)
 	return speed <= INT_MAX || speed == (__u32)SPEED_UNKNOWN;
 }
 
+/* Lanes, 1, 2, 4 or 8. */
+#define ETHTOOL_LANES_1			1
+#define ETHTOOL_LANES_2			2
+#define ETHTOOL_LANES_4			4
+#define ETHTOOL_LANES_8			8
+
+#define ETHTOOL_LANES_UNKNOWN		0
+
 /* Duplex, half or full. */
 #define DUPLEX_HALF		0x00
 #define DUPLEX_FULL		0x01
