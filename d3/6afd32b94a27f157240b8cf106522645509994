@@ -1,0 +1,12 @@
+v11: *Reword commit message.
+
+v9: *Remove from_ptys_lanes callback.
+    *Reword commit message.
+
+v7: *Split patch into two.
+
+v5: Pass ETHTOOL_LANES_UNKNOWN in case the driver does not support
+    getting number of lanes.
+
+v3: *Reword commit message.
+     *Fix from_ptys_lanes function.
