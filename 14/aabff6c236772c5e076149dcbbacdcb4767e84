@@ -1,0 +1,11 @@
+v15: *If lanes parameter from user is larger than the port's width, do not
+      return -EINVAL but return a zeroed bit map and handle it and the
+      caller function.
+     *Use && instead of double if in mlxsw_sp2_to_ptys_speed_lanes.
+     *Call mlxsw_sp_port_mask_width_get on lanes parameter only if it is
+      not zeroed to avoid warning.
+
+v13: *Use "ETHTOOL_LANES_UNKNOWN" define to compare lanes parameter.
+     *Create a variable "mask_cmp" to be the mask_width when lanes is not
+      passed from user space, or the mask_lanes when it is passed.
+      Use the variable for comparison with the link modes width.
