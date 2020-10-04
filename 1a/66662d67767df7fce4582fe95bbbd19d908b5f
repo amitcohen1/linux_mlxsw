@@ -1,0 +1,2 @@
+v15: *Zero the lanes parameter when it was not passed from user and
+      autoneg is off.
