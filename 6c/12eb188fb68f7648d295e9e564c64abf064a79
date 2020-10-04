@@ -1,0 +1,15 @@
+v12: *Remove the forcing bitmask and pass lanes parameter to driver
+      instead.
+
+v11: *Reword commit message.
+
+v9: *Add explantions and reword commit message.
+
+v6: *Change the condition for lanes value in the driver when lanes
+     parameter wasn't set by the user.
+
+v4: *When user sets only speed without lanes, choose the link mode with
+     max width.
+
+v3: *Reword commit message.
+    *Add a flag for supporting lanes setting in our driver.
