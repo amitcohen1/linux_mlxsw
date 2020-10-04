@@ -1,0 +1,5 @@
+v11: *Reword commit message.
+
+v9: *Reword commit message.
+
+v6: *Remove filtering of non-max width link modes in advertised as well.
