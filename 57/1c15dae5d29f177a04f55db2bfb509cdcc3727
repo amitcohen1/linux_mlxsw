@@ -1,0 +1,31 @@
+v12: *Change define name to ETHTOOL_CAP_LINK_LANES_SUPPORTED.
+
+v11: *Reword commit message.
+         *Use u32 instead of __u32 as lanes field.
+         *Reword comments.
+
+v10: *Merge patch #1 and #2.
+     *Reword commit message.
+     *Retrun error for not supporting lanes only when autoneg is off.
+
+v9: *Add  validation for lanes parameter.
+
+v7: *Change the value of ETHTOOL_LANES_UNKNOWN to 0.
+    *Change the conditions to support the zero-value of
+     ETHTOOL_LANES_UNKNOWN.
+
+v6: *Change define name to ETHTOOL_CAP_LINK_LANES_SUPPORTED.
+    *Add a input check for lanes with value 0, and add extacks.
+
+v5: *Move "lanes" from ethtool_link_settings to ethtool_link_ksettings.
+
+v4: *Fix the condition for returning an error when lanes setting is not
+     supported.
+
+v3: *Reword commit message.
+    *Merge two first patches into one.
+    *Fix the silent ignore when setting lanes in non-supporting driver.
+
+v2: *Add a "ETHTOOL_" prefix to "LANES".
+    *Move the constants to the end.
+    *Maintain 80cols limit in a comment.
