@@ -1,0 +1,2 @@
+v12: *Remove the forcing bitmask and pass lanes parameter to driver
+      instead.
