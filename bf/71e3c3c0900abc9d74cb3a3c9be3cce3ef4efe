@@ -1,0 +1,4 @@
+v13: *Use "ETHTOOL_LANES_UNKNOWN" define to compare lanes parameter.
+     *Create a variable "mask_cmp" to be the mask_width when lanes is not
+      passed from user space, or the mask_lanes when it is passed.
+      Use the variable for comparison with the link modes width.
