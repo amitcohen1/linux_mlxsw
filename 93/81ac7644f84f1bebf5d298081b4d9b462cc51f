@@ -1,0 +1,2 @@
+v7: *Add a test case for command without lanes.
+    *If ethtool is old, return a suitable massage.
