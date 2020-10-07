@@ -1,0 +1,2 @@
+v15: *Add a width field to sp1 link modes list so in sp1 machines the
+      number of lanes in use will be presented as well.
