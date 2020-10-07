@@ -1,2 +1,5 @@
-v15: *Zero the lanes parameter when it was not passed from user and
-      autoneg is off.
+v16: *Reword note and comment to set lanes param ot unknown instead of
+      zero it.
+
+v15: *Set the lanes parameter to UNKNOWN when it was not passed from user
+      and autoneg is off.
