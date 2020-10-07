@@ -1,4 +1,4 @@
-v16: *Reword note and comment to set lanes param ot unknown instead of
+v16: *Reword note and comment to set lanes param to unknown instead of
       zero it.
 
 v15: *Set the lanes parameter to UNKNOWN when it was not passed from user
