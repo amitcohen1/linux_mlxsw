@@ -428,6 +428,7 @@ static void mlxsw_sp_router_xm_cache_flush_work(struct work_struct *work)
 	switch (flush_info->proto) {
 	case MLXSW_SP_L3_PROTO_IPV4:
 		addr4 = *((u32 *) flush_info->addr);
+		addr4 &= mlxsw_sp_router_xm_flush_mask4(flush_info->prefix_len);
 
 		/* In case the flush prefix length is bigger than M-value,
 		 * it makes no sense to flush M entries. So just flush
