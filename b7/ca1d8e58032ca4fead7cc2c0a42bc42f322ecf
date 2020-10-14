@@ -1,1 +1,1 @@
-v17: *Use number instead ETHTOOL_LANES defines.
+v17: *Remove ETHTOOL_LANES defines and simply use a number instead.
