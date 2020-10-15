@@ -1,0 +1,1 @@
+v17: *Use u32 for lanes param instead ETHTOOL_LANES defines.
