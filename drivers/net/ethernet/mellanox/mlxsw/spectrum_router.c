@@ -6608,9 +6608,9 @@ static int mlxsw_sp_router_fib_event(struct notifier_block *nb,
 	}
 
 	/* Enqueue the event and trigger the work */
-	spin_lock(&router->fib_event_queue_lock);
+	spin_lock_bh(&router->fib_event_queue_lock);
 	list_add_tail(&fib_event->list, &router->fib_event_queue);
-	spin_unlock(&router->fib_event_queue_lock);
+	spin_unlock_bh(&router->fib_event_queue_lock);
 	mlxsw_core_schedule_work(&router->fib_event_work);
 
 	return NOTIFY_DONE;
