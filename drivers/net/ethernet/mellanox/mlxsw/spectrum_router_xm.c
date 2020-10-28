@@ -407,12 +407,11 @@ static void mlxsw_sp_router_xm_cache_flush_work(struct work_struct *work)
 	flush_info = &flush_node->flush_info;
 
 	if (flush_info->all) {
-		char rlpmce_pl[MLXSW_REG_RLPMCE_LEN];
+		char xmdr_pl[MLXSW_REG_XMDR_LEN];
 
-		mlxsw_reg_rlpmce_pack(rlpmce_pl, true,
-				      mlxsw_sp->router->xm->cache_disabled);
-		err = mlxsw_reg_write(mlxsw_sp->core, MLXSW_REG(rlpmce),
-				      rlpmce_pl);
+		/* Use XMDR for immediate cache flush. */
+		mlxsw_reg_xmdr_pack(xmdr_pl, false);
+		err = mlxsw_reg_write(mlxsw_sp->core, MLXSW_REG(xmdr), xmdr_pl);
 		if (err)
 			dev_err(mlxsw_sp->bus_info->dev, "Failed to flush XM cache\n");
 
