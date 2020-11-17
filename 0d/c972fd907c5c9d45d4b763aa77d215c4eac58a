@@ -1,3 +1,6 @@
+v3: *Reword an error message.
+    *Remove unnecessary check for one of the vetos.
+
 v2: *Reword commit message.
     *Remove double checking: upper is a bridge master and dev is a bridge
      port.
