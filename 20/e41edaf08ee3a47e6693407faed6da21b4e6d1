@@ -1,10 +1,10 @@
 RFC v2:
-     * Add a test case for vlan netdevice on top of a lag.
-     * Reword return error messages.
-     * Create one service function invoked from two wrappers with different
-       protocol parameters instead of creating two similar functions.
-     * Fix the test so it has one case of testing creation of VLAN on top of
-       a free-standing front panel port and one for creation of VLAN on top
-       of a bridge front panel port.
-     * Remove an empty line.
-     * Drop lines in comment.
+	* Add a test case for vlan netdevice on top of a lag.
+	* Reword return error messages.
+	* Create one service function invoked from two wrappers with different
+	  protocol parameters instead of creating two similar functions.
+	* Fix the test so it has one case of testing creation of VLAN on top of
+	  a free-standing front panel port and one for creation of VLAN on top
+	  of a bridge front panel port.
+	* Remove an empty line.
+	* Drop lines in comment.
