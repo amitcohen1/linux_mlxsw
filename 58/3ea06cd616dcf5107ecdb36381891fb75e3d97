@@ -1,15 +1,15 @@
 v1:
-    * Reword an error message.
-    * Remove unnecessary check for one of the vetos.
+	* Reword an error message.
+	* Remove unnecessary check for one of the vetos.
 
 RFC v2:
-    * Reword commit message.
-    * Remove double checking: upper is a bridge master and dev is a bridge
-      port.
-    * Reword extack messages.
-    * Drop the front panel bit so 802.1ad VLAN netdevices in general will
-      be vetoed.
-    * Add a veto for vlan netdevice on top of a lag.
-    * Veto creation of vlan netdevices only on top of our bridges.
-    * Use a new version of br_vlan_get_proto instead of
-      mlxsw_sp_bridge_vlan_proto_get_from_dev in the veto conditions.
+	* Reword commit message.
+	* Remove double checking: upper is a bridge master and dev is a bridge
+	  port.
+	* Reword extack messages.
+	* Drop the front panel bit so 802.1ad VLAN netdevices in general will
+	  be vetoed.
+	* Add a veto for vlan netdevice on top of a lag.
+	* Veto creation of vlan netdevices only on top of our bridges.
+	* Use a new version of br_vlan_get_proto instead of
+	  mlxsw_sp_bridge_vlan_proto_get_from_dev in the veto conditions.
