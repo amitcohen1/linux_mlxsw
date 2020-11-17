@@ -1,4 +1,6 @@
-v1: * Add mlxsw_sp_bridge_vlan_aware_port_leave()
+v1:
+	* Add mlxsw_sp_bridge_vlan_aware_port_leave()
 
-RFC v2: * Move mlxsw_sp_bridge_8021q_port_join() code to a common function
+RFC v2:
+	* Move mlxsw_sp_bridge_8021q_port_join() code to a common function
 	  in a separate patch
