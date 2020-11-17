@@ -1,14 +1,17 @@
-RFC v3: * Edit commit message
+RFC v3:
+	* Edit commit message
 	* Use mlxsw_sp_port_vlan_classification_set() instead of writing to
 	  SPVC directly
 	* Set SPVC as part of mlxsw_sp_bridge_8021ad_port_join() instead of
 	  mlxsw_sp_bridge_vlan_aware_port_join() so no need to pass Ethertype
 	* Use mlxsw_sp_bridge_vlan_aware_port_leave()
 
-RFC v2: * Split all the mlxsw_sp_port_pvid_set() changes into a different
+RFC v2:
+	* Split all the mlxsw_sp_port_pvid_set() changes into a different
 	  patch preceding this one
 	* Remove mlxsw_sp_bridge_vlan_proto_get() helper function
 	* Add mlxsw_sp_bridge_8021ad_vxlan_join() which returns
 	  -EOPNOTSUPP
 
-RFC v1: * Write to SPVC before calling mlxsw_sp_port_vlan_router_leave()
+RFC v1:
+	* Write to SPVC before calling mlxsw_sp_port_vlan_router_leave()
