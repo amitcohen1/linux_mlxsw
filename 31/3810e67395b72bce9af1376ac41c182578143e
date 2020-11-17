@@ -1,7 +1,7 @@
 v1:
 	* Reword an error message.
 	* Remove unnecessary check for one of the vetos.
-	*
+	* Undo changes in br_vlan_get_proto.
 
 RFC v2:
 	* Reword commit message.
