@@ -1,3 +1,5 @@
-v3: *Merge patch 1 and 2 into one.
+v1:
+    * Merge patch 1 and 2 into one.
 
-v2: *Reword commit message.
+RFC v2:
+    * Reword commit message.
