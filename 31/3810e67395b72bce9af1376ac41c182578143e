@@ -1,6 +1,7 @@
 v1:
 	* Reword an error message.
 	* Remove unnecessary check for one of the vetos.
+	*
 
 RFC v2:
 	* Reword commit message.
