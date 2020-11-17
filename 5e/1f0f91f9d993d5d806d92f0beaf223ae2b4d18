@@ -1,0 +1,5 @@
+v1: * Edit commit message
+
+RFC v2: * Edit commit in mlxsw_reg_spvc_pack()
+
+RFC v1: * Remove wrong apostrophe from "it's" and "its'"
