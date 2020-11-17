@@ -1,7 +1,10 @@
-v1: * Edit commit message
-    * Add helper function mlxsw_sp_port_vlan_classification_set()
+v1:
+	* Edit commit message
+	* Add helper function mlxsw_sp_port_vlan_classification_set()
 
-RFC v2: * Write to SPVC as part of port_create() instead of
+RFC v2:
+	* Write to SPVC as part of port_create() instead of
 	  8021q_port_join()
 
-RFC v1: * Write to SPVC before calling mlxsw_sp_port_vlan_router_leave()
+RFC v1:
+	* Write to SPVC before calling mlxsw_sp_port_vlan_router_leave()
