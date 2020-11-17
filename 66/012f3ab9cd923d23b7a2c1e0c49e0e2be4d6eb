@@ -1,4 +1,4 @@
-RFC v3:
+v1:
 	* Edit commit message
 	* Use mlxsw_sp_port_vlan_classification_set() instead of writing to
 	  SPVC directly
