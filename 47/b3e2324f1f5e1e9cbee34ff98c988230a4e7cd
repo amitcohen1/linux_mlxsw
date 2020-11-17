@@ -1,6 +1,8 @@
-v1: * Edit commit message
+v1:
+	* Edit commit message
 
-RFC v2: * Split all the mlxsw_sp_port_pvid_set() changes into a different
+RFC v2:
+	* Split all the mlxsw_sp_port_pvid_set() changes into a different
 	  patch
 	* Use 'u16 ethtype' and then translate it to et_vlan instead of
 	  using magic numbers
