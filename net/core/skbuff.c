@@ -1522,6 +1522,7 @@ struct sk_buff *skb_copy(const struct sk_buff *skb, gfp_t gfp_mask)
 
 	BUG_ON(skb_copy_bits(skb, -headerlen, n->head, headerlen + skb->len));
 
+	skb_ext_put(n);
 	skb_copy_header(n, skb);
 	return n;
 }
