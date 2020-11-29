@@ -1825,6 +1825,7 @@ static inline void mlxsw_reg_spvtr_pack(char *payload, bool tport,
 	mlxsw_reg_spvtr_tport_set(payload, tport);
 	mlxsw_reg_spvtr_local_port_set(payload, local_port);
 	mlxsw_reg_spvtr_ipvid_mode_set(payload, ipvid_mode);
+	mlxsw_reg_spvtr_ipve_set(payload, ipvid_mode ? true : false);
 }
 
 /* SVPE - Switch Virtual-Port Enabling Register
