@@ -106,6 +106,7 @@ fib_sync_mem - UNSIGNED INTEGER
 
 	Default: 512kB   Minimum: 64kB   Maximum: 64MB
 
+# TODO
 ip_forward_update_priority - INTEGER
 	Whether to update SKB priority from "TOS" field in IPv4 header after it
 	is forwarded. The new SKB priority is mapped from TOS field value
