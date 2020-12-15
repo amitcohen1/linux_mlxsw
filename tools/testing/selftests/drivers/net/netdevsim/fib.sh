@@ -8,27 +8,6 @@ lib_dir=$(dirname $0)/../../../net/forwarding
 
 ALL_TESTS="
 	ipv4_identical_routes
-	ipv4_tos
-	ipv4_metric
-	ipv4_replace
-	ipv4_delete
-	ipv4_plen
-	ipv4_replay
-	ipv4_flush
-	ipv4_error_path
-	ipv6_add
-	ipv6_metric
-	ipv6_append_single
-	ipv6_replace_single
-	ipv6_metric_multipath
-	ipv6_append_multipath
-	ipv6_replace_multipath
-	ipv6_append_multipath_to_single
-	ipv6_delete_single
-	ipv6_delete_multipath
-	ipv6_replay_single
-	ipv6_replay_multipath
-	ipv6_error_path
 "
 NETDEVSIM_PATH=/sys/bus/netdevsim/
 DEV_ADDR=1337
@@ -305,23 +284,27 @@ ipv6_error_path()
 setup_prepare()
 {
 	local netdev
-
+	read -p 1
 	modprobe netdevsim &> /dev/null
-
+	read -p 2
 	echo "$DEV_ADDR 1" > ${NETDEVSIM_PATH}/new_device
+	read -p 3
 	while [ ! -d $SYSFS_NET_DIR ] ; do :; done
+	read -p 4
 
 	ip netns add testns1
+	read -p 5
 	if [ $? -ne 0 ]; then
 		echo "Failed to add netns \"testns1\""
 		exit 1
 	fi
-
+	read -p 6
 	devlink dev reload $DEVLINK_DEV netns testns1
 	if [ $? -ne 0 ]; then
 		echo "Failed to reload into netns \"testns1\""
 		exit 1
 	fi
+	read -p 7
 }
 
 cleanup()
