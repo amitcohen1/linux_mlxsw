@@ -103,6 +103,8 @@ static const struct rhashtable_params nsim_nexthop_ht_params = {
 	.automatic_shrinking = true,
 };
 
+static struct workqueue_struct *nsim_owq;
+
 u64 nsim_fib_get_val(struct nsim_fib_data *fib_data,
 		     enum nsim_resource_id res_id, bool max)
 {
@@ -1130,12 +1132,18 @@ struct nsim_fib_data *nsim_fib_create(struct devlink *devlink,
 		goto err_rhashtable_fib_destroy;
 	}
 
+	nsim_owq = alloc_ordered_workqueue("netdevsim_ordered", WQ_MEM_RECLAIM);
+	if (!nsim_owq) {
+		err = -ENOMEM;
+		goto err_nexthop_nb_unregister;
+	}
+
 	data->fib_nb.notifier_call = nsim_fib_event_nb;
 	err = register_fib_notifier(devlink_net(devlink), &data->fib_nb,
 				    nsim_fib_dump_inconsistent, extack);
 	if (err) {
 		pr_err("Failed to register fib notifier\n");
-		goto err_nexthop_nb_unregister;
+		goto err_ordered_workqueue_destroy;
 	}
 
 	devlink_resource_occ_get_register(devlink,
@@ -1160,6 +1168,8 @@ struct nsim_fib_data *nsim_fib_create(struct devlink *devlink,
 					  data);
 	return data;
 
+err_ordered_workqueue_destroy:
+	destroy_workqueue(nsim_owq);
 err_nexthop_nb_unregister:
 	unregister_nexthop_notifier(devlink_net(devlink), &data->nexthop_nb);
 err_rhashtable_fib_destroy:
@@ -1186,11 +1196,14 @@ void nsim_fib_destroy(struct devlink *devlink, struct nsim_fib_data *data)
 	devlink_resource_occ_get_unregister(devlink,
 					    NSIM_RESOURCE_IPV4_FIB);
 	unregister_fib_notifier(devlink_net(devlink), &data->fib_nb);
+	flush_workqueue(nsim_owq);
+	destroy_workqueue(nsim_owq);
 	unregister_nexthop_notifier(devlink_net(devlink), &data->nexthop_nb);
 	rhashtable_free_and_destroy(&data->fib_rt_ht, nsim_fib_rt_free,
 				    data);
 	rhashtable_free_and_destroy(&data->nexthop_ht, nsim_nexthop_free,
 				    data);
 	WARN_ON_ONCE(!list_empty(&data->fib_rt_list));
+	WARN_ON(!list_empty(&data->fib_event_queue));
 	kfree(data);
 }
