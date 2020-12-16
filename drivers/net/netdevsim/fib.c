@@ -46,7 +46,8 @@ struct nsim_fib_data {
 	struct nsim_fib_entry nexthops;
 	struct rhashtable fib_rt_ht;
 	struct list_head fib_rt_list;
-	spinlock_t fib_lock;	/* Protects hashtable, list and accounting */
+	spinlock_t fib_lock;	/* Protects hashtable and list */
+	spinlock_t fib_accounting_lock; /* Protects accounting */
 	struct notifier_block nexthop_nb;
 	struct rhashtable nexthop_ht;
 	struct devlink *devlink;
@@ -109,6 +110,9 @@ u64 nsim_fib_get_val(struct nsim_fib_data *fib_data,
 		     enum nsim_resource_id res_id, bool max)
 {
 	struct nsim_fib_entry *entry;
+	u64 val;
+
+	spin_lock_bh(&fib_data->fib_accounting_lock);
 
 	switch (res_id) {
 	case NSIM_RESOURCE_IPV4_FIB:
@@ -130,7 +134,9 @@ u64 nsim_fib_get_val(struct nsim_fib_data *fib_data,
 		return 0;
 	}
 
-	return max ? entry->max : entry->num;
+	val = max ? entry->max : entry->num;
+	spin_unlock_bh(&fib_data->fib_accounting_lock);
+	return val;
 }
 
 static void nsim_fib_set_max(struct nsim_fib_data *fib_data,
@@ -161,11 +167,13 @@ static void nsim_fib_set_max(struct nsim_fib_data *fib_data,
 	entry->max = val;
 }
 
-static int nsim_fib_rule_account(struct nsim_fib_entry *entry, bool add,
+static int nsim_fib_rule_account(struct nsim_fib_data *data,
+				 struct nsim_fib_entry *entry, bool add,
 				 struct netlink_ext_ack *extack)
 {
 	int err = 0;
 
+	spin_lock_bh(&data->fib_accounting_lock);
 	if (add) {
 		if (entry->num < entry->max) {
 			entry->num++;
@@ -177,6 +185,7 @@ static int nsim_fib_rule_account(struct nsim_fib_entry *entry, bool add,
 		entry->num--;
 	}
 
+	spin_unlock_bh(&data->fib_accounting_lock);
 	return err;
 }
 
@@ -188,21 +197,23 @@ static int nsim_fib_rule_event(struct nsim_fib_data *data,
 
 	switch (info->family) {
 	case AF_INET:
-		err = nsim_fib_rule_account(&data->ipv4.rules, add, extack);
+		err = nsim_fib_rule_account(data, &data->ipv4.rules, add, extack);
 		break;
 	case AF_INET6:
-		err = nsim_fib_rule_account(&data->ipv6.rules, add, extack);
+		err = nsim_fib_rule_account(data, &data->ipv6.rules, add, extack);
 		break;
 	}
 
 	return err;
 }
 
-static int nsim_fib_account(struct nsim_fib_entry *entry, bool add,
+static int nsim_fib_account(struct nsim_fib_data *data,
+			    struct nsim_fib_entry *entry, bool add,
 			    struct netlink_ext_ack *extack)
 {
 	int err = 0;
 
+	spin_lock_bh(&data->fib_accounting_lock);
 	if (add) {
 		if (entry->num < entry->max) {
 			entry->num++;
@@ -214,6 +225,7 @@ static int nsim_fib_account(struct nsim_fib_entry *entry, bool add,
 		entry->num--;
 	}
 
+	spin_unlock_bh(&data->fib_accounting_lock);
 	return err;
 }
 
@@ -319,7 +331,7 @@ static int nsim_fib4_rt_add(struct nsim_fib_data *data,
 	struct net *net = devlink_net(data->devlink);
 	int err;
 
-	err = nsim_fib_account(&data->ipv4.fib, true, extack);
+	err = nsim_fib_account(data, &data->ipv4.fib, true, extack);
 	if (err)
 		return err;
 
@@ -336,7 +348,7 @@ static int nsim_fib4_rt_add(struct nsim_fib_data *data,
 	return 0;
 
 err_fib_dismiss:
-	nsim_fib_account(&data->ipv4.fib, false, extack);
+	nsim_fib_account(data, &data->ipv4.fib, false, extack);
 	return err;
 }
 
@@ -401,7 +413,7 @@ static void nsim_fib4_rt_remove(struct nsim_fib_data *data,
 
 	rhashtable_remove_fast(&data->fib_rt_ht, &fib4_rt->common.ht_node,
 			       nsim_fib_rt_ht_params);
-	nsim_fib_account(&data->ipv4.fib, false, extack);
+	nsim_fib_account(data, &data->ipv4.fib, false, extack);
 	nsim_fib4_rt_destroy(fib4_rt);
 }
 
@@ -618,7 +630,7 @@ static int nsim_fib6_rt_add(struct nsim_fib_data *data,
 {
 	int err;
 
-	err = nsim_fib_account(&data->ipv6.fib, true, extack);
+	err = nsim_fib_account(data, &data->ipv6.fib, true, extack);
 	if (err)
 		return err;
 
@@ -635,7 +647,7 @@ static int nsim_fib6_rt_add(struct nsim_fib_data *data,
 	return 0;
 
 err_fib_dismiss:
-	nsim_fib_account(&data->ipv6.fib, false, extack);
+	nsim_fib_account(data, &data->ipv6.fib, false, extack);
 	return err;
 }
 
@@ -713,7 +725,7 @@ nsim_fib6_rt_remove(struct nsim_fib_data *data,
 
 	rhashtable_remove_fast(&data->fib_rt_ht, &fib6_rt->common.ht_node,
 			       nsim_fib_rt_ht_params);
-	nsim_fib_account(&data->ipv6.fib, false, extack);
+	nsim_fib_account(data, &data->ipv6.fib, false, extack);
 	nsim_fib6_rt_destroy(fib6_rt);
 }
 
@@ -773,24 +785,21 @@ static int nsim_fib_event_nb(struct notifier_block *nb, unsigned long event,
 	struct fib_notifier_info *info = ptr;
 	int err = 0;
 
-	/* IPv6 routes can be added via RAs from softIRQ. */
-	spin_lock_bh(&data->fib_lock);
-
 	switch (event) {
 	case FIB_EVENT_RULE_ADD:
 	case FIB_EVENT_RULE_DEL:
 		err = nsim_fib_rule_event(data, info,
 					  event == FIB_EVENT_RULE_ADD);
 		break;
-
 	case FIB_EVENT_ENTRY_REPLACE:
 	case FIB_EVENT_ENTRY_APPEND:
 	case FIB_EVENT_ENTRY_DEL:
+		/* IPv6 routes can be added via RAs from softIRQ. */
+		spin_lock_bh(&data->fib_lock);
 		err = nsim_fib_event(data, info, event);
+		spin_unlock_bh(&data->fib_lock);
 		break;
 	}
-
-	spin_unlock_bh(&data->fib_lock);
 
 	return notifier_from_errno(err);
 }
@@ -803,7 +812,7 @@ static void nsim_fib4_rt_free(struct nsim_fib_rt *fib_rt,
 
 	fib4_rt = container_of(fib_rt, struct nsim_fib4_rt, common);
 	nsim_fib4_rt_hw_flags_set(devlink_net(devlink), fib4_rt, false);
-	nsim_fib_account(&data->ipv4.fib, false, NULL);
+	nsim_fib_account(data, &data->ipv4.fib, false, NULL);
 	nsim_fib4_rt_destroy(fib4_rt);
 }
 
@@ -814,7 +823,7 @@ static void nsim_fib6_rt_free(struct nsim_fib_rt *fib_rt,
 
 	fib6_rt = container_of(fib_rt, struct nsim_fib6_rt, common);
 	nsim_fib6_rt_hw_flags_set(data, fib6_rt, false);
-	nsim_fib_account(&data->ipv6.fib, false, NULL);
+	nsim_fib_account(data, &data->ipv6.fib, false, NULL);
 	nsim_fib6_rt_destroy(fib6_rt);
 }
 
@@ -851,8 +860,10 @@ static void nsim_fib_dump_inconsistent(struct notifier_block *nb)
 		nsim_fib_rt_free(fib_rt, data);
 	}
 
+	spin_lock_bh(&data->fib_accounting_lock);
 	data->ipv4.rules.num = 0ULL;
 	data->ipv6.rules.num = 0ULL;
+	spin_unlock_bh(&data->fib_accounting_lock);
 }
 
 static struct nsim_nexthop *nsim_nexthop_create(struct nsim_fib_data *data,
@@ -895,6 +906,7 @@ static int nsim_nexthop_account(struct nsim_fib_data *data, u64 occ,
 {
 	int err = 0;
 
+	spin_lock_bh(&data->fib_accounting_lock);
 	if (add) {
 		if (data->nexthops.num + occ <= data->nexthops.max) {
 			data->nexthops.num += occ;
@@ -907,6 +919,8 @@ static int nsim_nexthop_account(struct nsim_fib_data *data, u64 occ,
 			return -EINVAL;
 		data->nexthops.num -= occ;
 	}
+
+	spin_unlock_bh(&data->fib_accounting_lock);
 
 	return err;
 }
@@ -1117,6 +1131,7 @@ struct nsim_fib_data *nsim_fib_create(struct devlink *devlink,
 		goto err_data_free;
 
 	spin_lock_init(&data->fib_lock);
+	spin_lock_init(&data->fib_accounting_lock);
 	INIT_LIST_HEAD(&data->fib_rt_list);
 	err = rhashtable_init(&data->fib_rt_ht, &nsim_fib_rt_ht_params);
 	if (err)
