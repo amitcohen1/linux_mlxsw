@@ -816,6 +816,9 @@ static int nsim_fib_event_schedule_work(struct nsim_fib_data *data,
 	struct nsim_fib_event *fib_event;
 
 	fib_event = kzalloc(sizeof(*fib_event), GFP_ATOMIC);
+	if (!fib_event)
+		return NOTIFY_BAD;
+
 	fib_event->data = data;
 	fib_event->event = event;
 	fib_event->family = info->family;
@@ -843,6 +846,7 @@ static int nsim_fib_event_schedule_work(struct nsim_fib_data *data,
 	list_add_tail(&fib_event->list, &data->fib_event_queue);
 	spin_unlock_bh(&data->fib_event_queue_lock);
 	queue_work(nsim_owq, &data->fib_event_work);
+
 	return NOTIFY_DONE;
 }
 
@@ -1200,6 +1204,7 @@ static void nsim_fib_event_work(struct work_struct *work)
 		case FIB_EVENT_ENTRY_APPEND:
 		case FIB_EVENT_ENTRY_DEL:
 			nsim_fib_event(fib_event);
+			kfree(fib_event);
 		}
 	}
 	mutex_unlock(&data->fib_lock);
