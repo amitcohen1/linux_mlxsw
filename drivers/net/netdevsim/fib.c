@@ -147,6 +147,7 @@ static void nsim_fib_set_max(struct nsim_fib_data *fib_data,
 {
 	struct nsim_fib_entry *entry;
 
+	spin_lock_bh(&fib_data->fib_accounting_lock);
 	switch (res_id) {
 	case NSIM_RESOURCE_IPV4_FIB:
 		entry = &fib_data->ipv4.fib;
@@ -168,6 +169,7 @@ static void nsim_fib_set_max(struct nsim_fib_data *fib_data,
 		return;
 	}
 	entry->max = val;
+	spin_unlock_bh(&fib_data->fib_accounting_lock);
 }
 
 static int nsim_fib_rule_account(struct nsim_fib_data *data,
