@@ -336,25 +336,17 @@ static int nsim_fib4_rt_add(struct nsim_fib_data *data,
 	struct net *net = devlink_net(data->devlink);
 	int err;
 
-	err = nsim_fib_account(data, &data->ipv4.fib, true, extack);
-	if (err)
-		return err;
-
 	err = rhashtable_insert_fast(&data->fib_rt_ht,
 				     &fib4_rt->common.ht_node,
 				     nsim_fib_rt_ht_params);
 	if (err) {
 		NL_SET_ERR_MSG_MOD(extack, "Failed to insert IPv4 route");
-		goto err_fib_dismiss;
+		return err;
 	}
 
 	nsim_fib4_rt_hw_flags_set(net, fib4_rt, true);
 
 	return 0;
-
-err_fib_dismiss:
-	nsim_fib_account(data, &data->ipv4.fib, false, extack);
-	return err;
 }
 
 static int nsim_fib4_rt_replace(struct nsim_fib_data *data,
@@ -365,7 +357,13 @@ static int nsim_fib4_rt_replace(struct nsim_fib_data *data,
 	struct net *net = devlink_net(data->devlink);
 	int err;
 
-	/* We are replacing a route, so no need to change the accounting. */
+	/* We are replacing a route, so need to remove the accounting which
+	 * was increased when FIB_EVENT_ENTRY_REPLACE was triggered.
+	 */
+	err = nsim_fib_account(data, &data->ipv4.fib, false, extack);
+	if (err)
+		return err;
+
 	err = rhashtable_replace_fast(&data->fib_rt_ht,
 				      &fib4_rt_old->common.ht_node,
 				      &fib4_rt->common.ht_node,
@@ -643,25 +641,17 @@ static int nsim_fib6_rt_add(struct nsim_fib_data *data,
 {
 	int err;
 
-	err = nsim_fib_account(data, &data->ipv6.fib, true, extack);
-	if (err)
-		return err;
-
 	err = rhashtable_insert_fast(&data->fib_rt_ht,
 				     &fib6_rt->common.ht_node,
 				     nsim_fib_rt_ht_params);
 	if (err) {
 		NL_SET_ERR_MSG_MOD(extack, "Failed to insert IPv6 route");
-		goto err_fib_dismiss;
+		return err;
 	}
 
 	nsim_fib6_rt_hw_flags_set(data, fib6_rt, true);
 
 	return 0;
-
-err_fib_dismiss:
-	nsim_fib_account(data, &data->ipv6.fib, false, extack);
-	return err;
 }
 
 static int nsim_fib6_rt_replace(struct nsim_fib_data *data,
@@ -671,7 +661,13 @@ static int nsim_fib6_rt_replace(struct nsim_fib_data *data,
 {
 	int err;
 
-	/* We are replacing a route, so no need to change the accounting. */
+	/* We are replacing a route, so need to remove the accounting which
+	 * was increased when FIB_EVENT_ENTRY_REPLACE was triggered.
+	 */
+	err = nsim_fib_account(data, &data->ipv6.fib, false, extack);
+	if (err)
+		return err;
+
 	err = rhashtable_replace_fast(&data->fib_rt_ht,
 				      &fib6_rt_old->common.ht_node,
 				      &fib6_rt->common.ht_node,
@@ -809,13 +805,72 @@ static int nsim_fib_event(struct nsim_fib_event *fib_event)
 	return err;
 }
 
+static int nsim_fib4_prepare_event(struct fib_notifier_info *info,
+				   struct nsim_fib_event *fib_event,
+				   unsigned long event)
+{
+	struct fib_entry_notifier_info *fen_info;
+	struct netlink_ext_ack *extack;
+	int err = 0;
+
+	fen_info = container_of(info, struct fib_entry_notifier_info,
+				info);
+	fib_event->fen_info = *fen_info;
+	extack = fib_event->fen_info.info.extack;
+
+	if (event == FIB_EVENT_ENTRY_REPLACE) {
+		err = nsim_fib_account(fib_event->data,
+				       &fib_event->data->ipv4.fib, true,
+				       extack);
+
+		if (err)
+			return err;
+	}
+
+	/* Take reference on fib_info to prevent it from being
+	 * freed while event is queued. Release it afterwards.
+	 */
+	fib_info_hold(fib_event->fen_info.fi);
+
+	return 0;
+}
+
+static int nsim_fib6_prepare_event(struct fib_notifier_info *info,
+				   struct nsim_fib_event *fib_event,
+				   unsigned long event)
+{
+	struct fib6_entry_notifier_info *fen6_info;
+	struct netlink_ext_ack *extack;
+	int err = 0;
+
+	fen6_info = container_of(info, struct fib6_entry_notifier_info,
+				 info);
+	fib_event->fen6_info = *fen6_info;
+	extack = fib_event->fen6_info.info.extack;
+
+	if (event == FIB_EVENT_ENTRY_REPLACE) {
+		err = nsim_fib_account(fib_event->data,
+				       &fib_event->data->ipv6.fib, true,
+				       extack);
+
+		if (err)
+			return err;
+	}
+
+	/* Take reference on fen6_info to prevent it from being
+	 * freed while event is queued. Release it afterwards.
+	 */
+	fib6_info_hold(fib_event->fen6_info.rt);
+
+	return 0;
+}
+
 static int nsim_fib_event_schedule_work(struct nsim_fib_data *data,
 					struct fib_notifier_info *info,
 					unsigned long event)
 {
-	struct fib6_entry_notifier_info *fen6_info;
-	struct fib_entry_notifier_info *fen_info;
 	struct nsim_fib_event *fib_event;
+	int err;
 
 	fib_event = kzalloc(sizeof(*fib_event), GFP_ATOMIC);
 	if (!fib_event)
@@ -827,21 +882,15 @@ static int nsim_fib_event_schedule_work(struct nsim_fib_data *data,
 
 	switch (info->family) {
 	case AF_INET:
-		fen_info = container_of(info, struct fib_entry_notifier_info,
-					info);
-		fib_event->fen_info = *fen_info;
-		/* Take reference on fib_info to prevent it from being
-		 * freed while event is queued. Release it afterwards.
-		 */
-		fib_info_hold(fib_event->fen_info.fi);
+		err = nsim_fib4_prepare_event(info, fib_event, event);
 		break;
 	case AF_INET6:
-		fen6_info = container_of(info, struct fib6_entry_notifier_info,
-					 info);
-		fib_event->fen6_info = *fen6_info;
-		fib6_info_hold(fen6_info->rt);
+		err = nsim_fib6_prepare_event(info, fib_event, event);
 		break;
 	}
+
+	if (err)
+		goto err_fib_prepare_event;
 
 	/* Enqueue the event and trigger the work */
 	spin_lock_bh(&data->fib_event_queue_lock);
@@ -850,6 +899,10 @@ static int nsim_fib_event_schedule_work(struct nsim_fib_data *data,
 	queue_work(nsim_owq, &data->fib_event_work);
 
 	return NOTIFY_DONE;
+
+err_fib_prepare_event:
+	kfree(fib_event);
+	return NOTIFY_BAD;
 }
 
 static int nsim_fib_event_nb(struct notifier_block *nb, unsigned long event,
