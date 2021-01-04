@@ -489,9 +489,9 @@ static void nsim_fib6_rt_nh_del(struct nsim_fib6_rt *fib6_rt,
 
 static struct nsim_fib6_rt *
 nsim_fib6_rt_create(struct nsim_fib_data *data,
-		    struct fib6_entry_notifier_info *fen6_info)
+		    struct fib6_info **rt_arr, unsigned int nrt6)
 {
-	struct fib6_info *iter, *rt = fen6_info->rt;
+	struct fib6_info *rt = rt_arr[0];
 	struct nsim_fib6_rt *fib6_rt;
 	int i = 0;
 	int err;
@@ -510,32 +510,18 @@ nsim_fib6_rt_create(struct nsim_fib_data *data,
 	 */
 	INIT_LIST_HEAD(&fib6_rt->nh_list);
 
-	err = nsim_fib6_rt_nh_add(fib6_rt, rt);
-	if (err)
-		goto err_fib_rt_fini;
-
-	if (!fen6_info->nsiblings)
-		return fib6_rt;
-
-	list_for_each_entry(iter, &rt->fib6_siblings, fib6_siblings) {
-		if (i == fen6_info->nsiblings)
-			break;
-
-		err = nsim_fib6_rt_nh_add(fib6_rt, iter);
+	for (i = 0; i < nrt6; i++) {
+		err = nsim_fib6_rt_nh_add(fib6_rt, rt_arr[i]);
 		if (err)
 			goto err_fib6_rt_nh_del;
-		i++;
 	}
-	WARN_ON_ONCE(i != fen6_info->nsiblings);
 
 	return fib6_rt;
 
 err_fib6_rt_nh_del:
-	list_for_each_entry_continue_reverse(iter, &rt->fib6_siblings,
-					     fib6_siblings)
-		nsim_fib6_rt_nh_del(fib6_rt, iter);
-	nsim_fib6_rt_nh_del(fib6_rt, rt);
-err_fib_rt_fini:
+	for (i--; i >= 0; i--) {
+		nsim_fib6_rt_nh_del(fib6_rt, rt_arr[i]);
+	};
 	nsim_fib_rt_fini(&fib6_rt->common);
 	kfree(fib6_rt);
 	return ERR_PTR(err);
@@ -580,47 +566,31 @@ nsim_fib6_rt_lookup(struct rhashtable *fib_rt_ht, const struct fib6_info *rt)
 }
 
 static int nsim_fib6_rt_append(struct nsim_fib_data *data,
-			       struct fib6_entry_notifier_info *fen6_info)
+			       struct fib6_info **rt_arr, unsigned int nrt6)
 {
-	struct fib6_info *iter, *rt = fen6_info->rt;
+	struct fib6_info *rt = rt_arr[0];
 	struct nsim_fib6_rt *fib6_rt;
-	int i = 0;
-	int err;
+	int i, err;
 
 	fib6_rt = nsim_fib6_rt_lookup(&data->fib_rt_ht, rt);
 	if (WARN_ON_ONCE(!fib6_rt))
 		return -EINVAL;
 
-	err = nsim_fib6_rt_nh_add(fib6_rt, rt);
-	if (err)
-		return err;
-	rt->trap = true;
-
-	if (!fen6_info->nsiblings)
-		return 0;
-
-	list_for_each_entry(iter, &rt->fib6_siblings, fib6_siblings) {
-		if (i == fen6_info->nsiblings)
-			break;
-
-		err = nsim_fib6_rt_nh_add(fib6_rt, iter);
+	for (i = 0; i < nrt6; i++) {
+		err = nsim_fib6_rt_nh_add(fib6_rt, rt_arr[i]);
 		if (err)
 			goto err_fib6_rt_nh_del;
-		iter->trap = true;
-		i++;
+
+		rt_arr[i]->trap = true;
 	}
-	WARN_ON_ONCE(i != fen6_info->nsiblings);
 
 	return 0;
 
 err_fib6_rt_nh_del:
-	list_for_each_entry_continue_reverse(iter, &rt->fib6_siblings,
-					     fib6_siblings) {
-		iter->trap = false;
-		nsim_fib6_rt_nh_del(fib6_rt, iter);
+	for (i--; i >= 0; i--) {
+		rt_arr[i]->trap = false;
+		nsim_fib6_rt_nh_del(fib6_rt, rt_arr[i]);
 	}
-	rt->trap = false;
-	nsim_fib6_rt_nh_del(fib6_rt, rt);
 	return err;
 }
 
@@ -686,21 +656,24 @@ static int nsim_fib6_rt_replace(struct nsim_fib_data *data,
 }
 
 static int nsim_fib6_rt_insert(struct nsim_fib_data *data,
-			       struct fib6_entry_notifier_info *fen6_info)
+			       struct fib6_info **rt_arr, unsigned int nrt6)
 {
-	struct netlink_ext_ack *extack = fen6_info->info.extack;
+	//struct netlink_ext_ack *extack = fen6_info->info.extack;
 	struct nsim_fib6_rt *fib6_rt, *fib6_rt_old;
+	struct fib6_info *rt = rt_arr[0];
 	int err;
 
-	fib6_rt = nsim_fib6_rt_create(data, fen6_info);
+	fib6_rt = nsim_fib6_rt_create(data, rt_arr, nrt6);
 	if (IS_ERR(fib6_rt))
 		return PTR_ERR(fib6_rt);
 
-	fib6_rt_old = nsim_fib6_rt_lookup(&data->fib_rt_ht, fen6_info->rt);
+	fib6_rt_old = nsim_fib6_rt_lookup(&data->fib_rt_ht, rt);
 	if (!fib6_rt_old)
-		err = nsim_fib6_rt_add(data, fib6_rt, extack);
+//		err = nsim_fib6_rt_add(data, fib6_rt, extack);
+		err = nsim_fib6_rt_add(data, fib6_rt, NULL);
 	else
-		err = nsim_fib6_rt_replace(data, fib6_rt, fib6_rt_old, extack);
+//		err = nsim_fib6_rt_replace(data, fib6_rt, fib6_rt_old, extack);
+		err = nsim_fib6_rt_replace(data, fib6_rt, fib6_rt_old, NULL);
 
 	if (err)
 		nsim_fib6_rt_destroy(fib6_rt);
@@ -710,66 +683,127 @@ static int nsim_fib6_rt_insert(struct nsim_fib_data *data,
 
 static void
 nsim_fib6_rt_remove(struct nsim_fib_data *data,
-		    const struct fib6_entry_notifier_info *fen6_info)
+		    struct fib6_info **rt_arr, unsigned int nrt6)
 {
-	struct netlink_ext_ack *extack = fen6_info->info.extack;
+//	struct netlink_ext_ack *extack = fen6_info->info.extack;
+	struct fib6_info *rt = rt_arr[0];
 	struct nsim_fib6_rt *fib6_rt;
+	int i;
 
 	/* Multipath routes are first added to the FIB trie and only then
 	 * notified. If we vetoed the addition, we will get a delete
 	 * notification for a route we do not have. Therefore, do not warn if
 	 * route was not found.
 	 */
-	fib6_rt = nsim_fib6_rt_lookup(&data->fib_rt_ht, fen6_info->rt);
+	fib6_rt = nsim_fib6_rt_lookup(&data->fib_rt_ht, rt);
 	if (!fib6_rt)
 		return;
 
 	/* If not all the nexthops are deleted, then only reduce the nexthop
 	 * group.
 	 */
-	if (fen6_info->nsiblings + 1 != fib6_rt->nhs) {
-		nsim_fib6_rt_nh_del(fib6_rt, fen6_info->rt);
+	if (nrt6 != fib6_rt->nhs) {
+		for (i = 0; i < nrt6; i++) {
+			nsim_fib6_rt_nh_del(fib6_rt, rt_arr[i]);
+		}
 		return;
 	}
 
+
 	rhashtable_remove_fast(&data->fib_rt_ht, &fib6_rt->common.ht_node,
 			       nsim_fib_rt_ht_params);
-	nsim_fib_account(data, &data->ipv6.fib, false, extack);
+//	nsim_fib_account(data, &data->ipv6.fib, false, extack);
+	nsim_fib_account(data, &data->ipv6.fib, false, NULL);
 	nsim_fib6_rt_destroy(fib6_rt);
 }
+
+struct nsim_fib6_event {
+	struct fib6_info **rt_arr;
+	unsigned int nrt6;
+};
 
 struct nsim_fib_event {
 	struct list_head list; /* node in fib queue */
 	union {
 		struct fib_entry_notifier_info fen_info;
-		struct fib6_entry_notifier_info fen6_info;
+		struct nsim_fib6_event fib6_event;
 	};
 	struct nsim_fib_data *data;
 	unsigned long event;
 	int family;
 };
 
+static int nsim_fib6_event_init(struct nsim_fib6_event *fib6_event,
+				struct fib6_entry_notifier_info *fen6_info)
+{
+	struct fib6_info *rt = fen6_info->rt;
+	struct fib6_info **rt_arr;
+	struct fib6_info *iter;
+	unsigned int nrt6;
+	int i = 0;
+
+	nrt6 = fen6_info->nsiblings + 1;
+
+	rt_arr = kcalloc(nrt6, sizeof(struct fib6_info *), GFP_ATOMIC);
+	if (!rt_arr)
+		return -ENOMEM;
+
+	fib6_event->rt_arr = rt_arr;
+	fib6_event->nrt6 = nrt6;
+
+	rt_arr[0] = rt;
+	fib6_info_hold(rt);
+
+	if (!fen6_info->nsiblings)
+		return 0;
+
+	list_for_each_entry(iter, &rt->fib6_siblings, fib6_siblings) {
+		if (i == fen6_info->nsiblings)
+			break;
+
+		rt_arr[i + 1] = iter;
+		fib6_info_hold(iter);
+		i++;
+	}
+	WARN_ON_ONCE(i != fen6_info->nsiblings);
+
+	return 0;
+}
+
+static void nsim_fib6_event_fini(struct nsim_fib6_event *fib6_event)
+{
+	int i;
+
+	for (i = 0; i < fib6_event->nrt6; i++)
+		nsim_rt6_release(fib6_event->rt_arr[i]);
+	kfree(fib6_event->rt_arr);
+}
+
 #if IS_ENABLED(CONFIG_IPV6)
 static int nsim_fib6_event(struct nsim_fib_data *data,
-			   struct fib6_entry_notifier_info fen6_info,
+			   struct nsim_fib6_event fib6_event,
 			   unsigned long event)
 {
 	int err = 0;
 
-	if (fen6_info.rt->fib6_src.plen) {
-		NL_SET_ERR_MSG_MOD(fen6_info.info.extack, "IPv6 source-specific route is not supported");
-		return 0;
+	if (fib6_event.rt_arr[0]->fib6_src.plen) {
+//		 TODO
+//		NL_SET_ERR_MSG_MOD(fen6_info.info.extack, "IPv6 source-specific route is not supported");
+//		return 0;
+		return -EINVAL;
 	}
 
 	switch (event) {
 	case FIB_EVENT_ENTRY_REPLACE:
-		err = nsim_fib6_rt_insert(data, &fen6_info);
+		err = nsim_fib6_rt_insert(data, fib6_event.rt_arr,
+					  fib6_event.nrt6);
 		break;
 	case FIB_EVENT_ENTRY_APPEND:
-		err = nsim_fib6_rt_append(data, &fen6_info);
+		err = nsim_fib6_rt_append(data, fib6_event.rt_arr,
+					  fib6_event.nrt6);
 		break;
 	case FIB_EVENT_ENTRY_DEL:
-		nsim_fib6_rt_remove(data, &fen6_info);
+		nsim_fib6_rt_remove(data, fib6_event.rt_arr, fib6_event.nrt6);
 		break;
 	default:
 		break;
@@ -791,14 +825,14 @@ static int nsim_fib_event(struct nsim_fib_event *fib_event)
 
 	switch (fib_event->family) {
 	case AF_INET:
-		err = nsim_fib4_event(fib_event->data, fib_event->fen_info,
-				      fib_event->event);
+		nsim_fib4_event(fib_event->data, fib_event->fen_info,
+				fib_event->event);
 		fib_info_put(fib_event->fen_info.fi);
 		break;
 	case AF_INET6:
-		err = nsim_fib6_event(fib_event->data, fib_event->fen6_info,
-				      fib_event->event);
-		nsim_rt6_release(fib_event->fen6_info.rt);
+		nsim_fib6_event(fib_event->data, fib_event->fib6_event,
+				fib_event->event);
+		nsim_fib6_event_fini(&fib_event->fib6_event);
 		break;
 	}
 
@@ -845,8 +879,11 @@ static int nsim_fib6_prepare_event(struct fib_notifier_info *info,
 
 	fen6_info = container_of(info, struct fib6_entry_notifier_info,
 				 info);
-	fib_event->fen6_info = *fen6_info;
-	extack = fib_event->fen6_info.info.extack;
+	extack = fen6_info->info.extack;
+
+	err = nsim_fib6_event_init(&fib_event->fib6_event, fen6_info);
+	if (err)
+		return err;
 
 	if (event == FIB_EVENT_ENTRY_REPLACE) {
 		err = nsim_fib_account(fib_event->data,
@@ -854,15 +891,14 @@ static int nsim_fib6_prepare_event(struct fib_notifier_info *info,
 				       extack);
 
 		if (err)
-			return err;
+			goto err_fib6_event_fini;
 	}
 
-	/* Take reference on fen6_info to prevent it from being
-	 * freed while event is queued. Release it afterwards.
-	 */
-	fib6_info_hold(fib_event->fen6_info.rt);
-
 	return 0;
+
+err_fib6_event_fini:
+	nsim_fib6_event_fini(&fib_event->fib6_event);
+	return err;
 }
 
 static int nsim_fib_event_schedule_work(struct nsim_fib_data *data,
