@@ -46,7 +46,7 @@ struct nsim_fib_data {
 	struct nsim_fib_entry nexthops;
 	struct rhashtable fib_rt_ht;
 	struct list_head fib_rt_list;
-	struct mutex fib_lock; /* Protects hashtable, list and accounting */
+	spinlock_t fib_lock; /* Protects hashtable and list */
 	spinlock_t fib_accounting_lock; /* Protects accounting */
 	struct notifier_block nexthop_nb;
 	struct rhashtable nexthop_ht;
@@ -227,9 +227,13 @@ static int nsim_fib_account(struct nsim_fib_data *data,
 			NL_SET_ERR_MSG_MOD(extack, "Exceeded number of supported fib entries");
 		}
 	} else {
+		if (!entry->num)
+			goto out;
+
 		entry->num--;
 	}
 
+out:
 	spin_unlock_bh(&data->fib_accounting_lock);
 	return err;
 }
@@ -336,9 +340,11 @@ static int nsim_fib4_rt_add(struct nsim_fib_data *data,
 	struct net *net = devlink_net(data->devlink);
 	int err;
 
+	spin_lock_bh(&data->fib_lock);
 	err = rhashtable_insert_fast(&data->fib_rt_ht,
 				     &fib4_rt->common.ht_node,
 				     nsim_fib_rt_ht_params);
+	spin_unlock_bh(&data->fib_lock);
 	if (err) {
 		NL_SET_ERR_MSG_MOD(extack, "Failed to insert IPv4 route");
 		return err;
@@ -364,10 +370,13 @@ static int nsim_fib4_rt_replace(struct nsim_fib_data *data,
 	if (err)
 		return err;
 
+	spin_lock_bh(&data->fib_lock);
 	err = rhashtable_replace_fast(&data->fib_rt_ht,
 				      &fib4_rt_old->common.ht_node,
 				      &fib4_rt->common.ht_node,
 				      nsim_fib_rt_ht_params);
+	spin_unlock_bh(&data->fib_lock);
+
 	if (err) {
 		NL_SET_ERR_MSG_MOD(extack, "Failed to replace IPv4 route");
 		return err;
@@ -392,7 +401,10 @@ static int nsim_fib4_rt_insert(struct nsim_fib_data *data,
 	if (!fib4_rt)
 		return -ENOMEM;
 
+	spin_lock_bh(&data->fib_lock);
 	fib4_rt_old = nsim_fib4_rt_lookup(&data->fib_rt_ht, fen_info);
+	spin_unlock_bh(&data->fib_lock);
+
 	if (!fib4_rt_old)
 		err = nsim_fib4_rt_add(data, fib4_rt, extack);
 	else
@@ -410,13 +422,16 @@ static void nsim_fib4_rt_remove(struct nsim_fib_data *data,
 	struct netlink_ext_ack *extack = fen_info->info.extack;
 	struct nsim_fib4_rt *fib4_rt;
 
+	spin_lock_bh(&data->fib_lock);
 	fib4_rt = nsim_fib4_rt_lookup(&data->fib_rt_ht, fen_info);
+
 	if (WARN_ON_ONCE(!fib4_rt))
 		return;
 
 	rhashtable_remove_fast(&data->fib_rt_ht, &fib4_rt->common.ht_node,
 			       nsim_fib_rt_ht_params);
-	nsim_fib_account(data, &data->ipv4.fib, false, extack);
+	spin_unlock_bh(&data->fib_lock);
+
 	nsim_fib4_rt_destroy(fib4_rt);
 }
 
@@ -572,7 +587,10 @@ static int nsim_fib6_rt_append(struct nsim_fib_data *data,
 	struct nsim_fib6_rt *fib6_rt;
 	int i, err;
 
+	spin_lock_bh(&data->fib_lock);
 	fib6_rt = nsim_fib6_rt_lookup(&data->fib_rt_ht, rt);
+	spin_unlock_bh(&data->fib_lock);
+
 	if (WARN_ON_ONCE(!fib6_rt))
 		return -EINVAL;
 
@@ -611,9 +629,12 @@ static int nsim_fib6_rt_add(struct nsim_fib_data *data,
 {
 	int err;
 
+	spin_lock_bh(&data->fib_lock);
 	err = rhashtable_insert_fast(&data->fib_rt_ht,
 				     &fib6_rt->common.ht_node,
 				     nsim_fib_rt_ht_params);
+	spin_unlock_bh(&data->fib_lock);
+
 	if (err) {
 		NL_SET_ERR_MSG_MOD(extack, "Failed to insert IPv6 route");
 		return err;
@@ -638,10 +659,13 @@ static int nsim_fib6_rt_replace(struct nsim_fib_data *data,
 	if (err)
 		return err;
 
+	spin_lock_bh(&data->fib_lock);
 	err = rhashtable_replace_fast(&data->fib_rt_ht,
 				      &fib6_rt_old->common.ht_node,
 				      &fib6_rt->common.ht_node,
 				      nsim_fib_rt_ht_params);
+	spin_unlock_bh(&data->fib_lock);
+
 	if (err) {
 		NL_SET_ERR_MSG_MOD(extack, "Failed to replace IPv6 route");
 		return err;
@@ -667,7 +691,10 @@ static int nsim_fib6_rt_insert(struct nsim_fib_data *data,
 	if (IS_ERR(fib6_rt))
 		return PTR_ERR(fib6_rt);
 
+	spin_lock_bh(&data->fib_lock);
 	fib6_rt_old = nsim_fib6_rt_lookup(&data->fib_rt_ht, rt);
+	spin_unlock_bh(&data->fib_lock);
+
 	if (!fib6_rt_old)
 //		err = nsim_fib6_rt_add(data, fib6_rt, extack);
 		err = nsim_fib6_rt_add(data, fib6_rt, NULL);
@@ -695,7 +722,10 @@ nsim_fib6_rt_remove(struct nsim_fib_data *data,
 	 * notification for a route we do not have. Therefore, do not warn if
 	 * route was not found.
 	 */
+	spin_lock_bh(&data->fib_lock);
 	fib6_rt = nsim_fib6_rt_lookup(&data->fib_rt_ht, rt);
+	spin_unlock_bh(&data->fib_lock);
+
 	if (!fib6_rt)
 		return;
 
@@ -710,10 +740,11 @@ nsim_fib6_rt_remove(struct nsim_fib_data *data,
 	}
 
 
+	spin_lock_bh(&data->fib_lock);
 	rhashtable_remove_fast(&data->fib_rt_ht, &fib6_rt->common.ht_node,
 			       nsim_fib_rt_ht_params);
-//	nsim_fib_account(data, &data->ipv6.fib, false, extack);
-	nsim_fib_account(data, &data->ipv6.fib, false, NULL);
+	spin_unlock_bh(&data->fib_lock);
+
 	nsim_fib6_rt_destroy(fib6_rt);
 }
 
@@ -843,6 +874,7 @@ static int nsim_fib4_prepare_event(struct fib_notifier_info *info,
 				   struct nsim_fib_event *fib_event,
 				   unsigned long event)
 {
+	struct nsim_fib_data *data = fib_event->data;
 	struct fib_entry_notifier_info *fen_info;
 	struct netlink_ext_ack *extack;
 	int err = 0;
@@ -852,13 +884,15 @@ static int nsim_fib4_prepare_event(struct fib_notifier_info *info,
 	fib_event->fen_info = *fen_info;
 	extack = fib_event->fen_info.info.extack;
 
-	if (event == FIB_EVENT_ENTRY_REPLACE) {
-		err = nsim_fib_account(fib_event->data,
-				       &fib_event->data->ipv4.fib, true,
-				       extack);
-
+	switch (event) {
+	case FIB_EVENT_ENTRY_REPLACE:
+		err = nsim_fib_account(data, &data->ipv4.fib, true, extack);
 		if (err)
 			return err;
+		break;
+	case FIB_EVENT_ENTRY_DEL:
+		nsim_fib_account(data, &data->ipv4.fib, false, extack);
+		break;
 	}
 
 	/* Take reference on fib_info to prevent it from being
@@ -873,6 +907,7 @@ static int nsim_fib6_prepare_event(struct fib_notifier_info *info,
 				   struct nsim_fib_event *fib_event,
 				   unsigned long event)
 {
+	struct nsim_fib_data *data = fib_event->data;
 	struct fib6_entry_notifier_info *fen6_info;
 	struct netlink_ext_ack *extack;
 	int err = 0;
@@ -885,13 +920,15 @@ static int nsim_fib6_prepare_event(struct fib_notifier_info *info,
 	if (err)
 		return err;
 
-	if (event == FIB_EVENT_ENTRY_REPLACE) {
-		err = nsim_fib_account(fib_event->data,
-				       &fib_event->data->ipv6.fib, true,
-				       extack);
-
-		if (err)
-			goto err_fib6_event_fini;
+	switch (event) {
+		case FIB_EVENT_ENTRY_REPLACE:
+			err = nsim_fib_account(data, &data->ipv6.fib, true, extack);
+			if (err)
+				goto err_fib6_event_fini;
+			break;
+		case FIB_EVENT_ENTRY_DEL:
+			nsim_fib_account(data, &data->ipv6.fib, false, extack);
+			break;
 	}
 
 	return 0;
@@ -1287,7 +1324,6 @@ static void nsim_fib_event_work(struct work_struct *work)
 	list_splice_init(&data->fib_event_queue, &fib_event_queue);
 	spin_unlock_bh(&data->fib_event_queue_lock);
 
-	mutex_lock(&data->fib_lock);
 	list_for_each_entry_safe(fib_event, next_fib_event, &fib_event_queue,
 				 list) {
 		switch (fib_event->event) {
@@ -1298,7 +1334,6 @@ static void nsim_fib_event_work(struct work_struct *work)
 			kfree(fib_event);
 		}
 	}
-	mutex_unlock(&data->fib_lock);
 }
 
 struct nsim_fib_data *nsim_fib_create(struct devlink *devlink,
@@ -1316,7 +1351,7 @@ struct nsim_fib_data *nsim_fib_create(struct devlink *devlink,
 	if (err)
 		goto err_data_free;
 
-	mutex_init(&data->fib_lock);
+	spin_lock_init(&data->fib_lock);
 	spin_lock_init(&data->fib_accounting_lock);
 	INIT_LIST_HEAD(&data->fib_rt_list);
 	err = rhashtable_init(&data->fib_rt_ht, &nsim_fib_rt_ht_params);
