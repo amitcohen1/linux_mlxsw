@@ -723,7 +723,7 @@ static int mlxsw_sp_nve_tunnel_init(struct mlxsw_sp *mlxsw_sp,
 	if (nve->num_nve_tunnels++ != 0)
 		return 0;
 
-	nve->config = *config;
+	nve->config = config;
 
 	err = mlxsw_sp_kvdl_alloc(mlxsw_sp, MLXSW_SP_KVDL_ENTRY_TYPE_ADJ, 1,
 				  &nve->tunnel_index);
@@ -741,7 +741,7 @@ err_ops_init:
 	mlxsw_sp_kvdl_free(mlxsw_sp, MLXSW_SP_KVDL_ENTRY_TYPE_ADJ, 1,
 			   nve->tunnel_index);
 err_kvdl_alloc:
-	memset(&nve->config, 0, sizeof(nve->config));
+	memset(nve->config, 0, sizeof(*nve->config));
 	nve->num_nve_tunnels--;
 	return err;
 }
@@ -751,13 +751,12 @@ static void mlxsw_sp_nve_tunnel_fini(struct mlxsw_sp *mlxsw_sp)
 	struct mlxsw_sp_nve *nve = mlxsw_sp->nve;
 	const struct mlxsw_sp_nve_ops *ops;
 
-	ops = nve->nve_ops_arr[nve->config.type];
+	ops = nve->nve_ops_arr[nve->config->type];
 
 	if (mlxsw_sp->nve->num_nve_tunnels == 1) {
 		ops->fini(nve);
 		mlxsw_sp_kvdl_free(mlxsw_sp, MLXSW_SP_KVDL_ENTRY_TYPE_ADJ, 1,
 				   nve->tunnel_index);
-		memset(&nve->config, 0, sizeof(nve->config));
 	}
 	nve->num_nve_tunnels--;
 }
@@ -793,7 +792,7 @@ int mlxsw_sp_nve_fid_enable(struct mlxsw_sp *mlxsw_sp, struct mlxsw_sp_fid *fid,
 {
 	struct mlxsw_sp_nve *nve = mlxsw_sp->nve;
 	const struct mlxsw_sp_nve_ops *ops;
-	struct mlxsw_sp_nve_config config;
+	struct mlxsw_sp_nve_config *config;
 	int err;
 
 	ops = nve->nve_ops_arr[params->type];
@@ -801,15 +800,20 @@ int mlxsw_sp_nve_fid_enable(struct mlxsw_sp *mlxsw_sp, struct mlxsw_sp_fid *fid,
 	if (!ops->can_offload(nve, params, extack))
 		return -EINVAL;
 
-	memset(&config, 0, sizeof(config));
-	ops->nve_config(nve, params, &config);
+	config = kzalloc(ops->config_size, GFP_ATOMIC);
+	if (!config)
+		return -ENOMEM;
+
+	ops->nve_config(nve, params, config);
+
 	if (nve->num_nve_tunnels &&
-	    memcmp(&config, &nve->config, sizeof(config))) {
+	    memcmp(config, nve->config, ops->config_size)) {
 		NL_SET_ERR_MSG_MOD(extack, "Conflicting NVE tunnels configuration");
-		return -EINVAL;
+		err = -EINVAL;
+		goto err_conflicting_nve_tunnels;
 	}
 
-	err = mlxsw_sp_nve_tunnel_init(mlxsw_sp, &config);
+	err = mlxsw_sp_nve_tunnel_init(mlxsw_sp, config);
 	if (err) {
 		NL_SET_ERR_MSG_MOD(extack, "Failed to initialize NVE tunnel");
 		return err;
@@ -826,12 +830,17 @@ int mlxsw_sp_nve_fid_enable(struct mlxsw_sp *mlxsw_sp, struct mlxsw_sp_fid *fid,
 	if (err)
 		goto err_fdb_replay;
 
+	if (nve->num_nve_tunnels > 1)
+		kfree(config);
+
 	return 0;
 
 err_fdb_replay:
 	mlxsw_sp_fid_vni_clear(fid);
 err_fid_vni_set:
 	mlxsw_sp_nve_tunnel_fini(mlxsw_sp);
+err_conflicting_nve_tunnels:
+	kfree(config);
 	return err;
 }
 
@@ -862,6 +871,8 @@ void mlxsw_sp_nve_fid_disable(struct mlxsw_sp *mlxsw_sp,
 out:
 	mlxsw_sp_fid_vni_clear(fid);
 	mlxsw_sp_nve_tunnel_fini(mlxsw_sp);
+	if (!mlxsw_sp->nve->num_nve_tunnels)
+		kfree(mlxsw_sp->nve->config);
 }
 
 int mlxsw_sp_port_nve_init(struct mlxsw_sp_port *mlxsw_sp_port)

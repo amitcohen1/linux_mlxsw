@@ -164,14 +164,14 @@ __mlxsw_sp_nve_inc_parsing_depth_put(struct mlxsw_sp *mlxsw_sp,
 
 int mlxsw_sp_nve_inc_parsing_depth_get(struct mlxsw_sp *mlxsw_sp)
 {
-	__be16 udp_dport = mlxsw_sp->nve->config.udp_dport;
+	__be16 udp_dport = mlxsw_sp->nve->config->udp_dport;
 
 	return __mlxsw_sp_nve_inc_parsing_depth_get(mlxsw_sp, udp_dport);
 }
 
 void mlxsw_sp_nve_inc_parsing_depth_put(struct mlxsw_sp *mlxsw_sp)
 {
-	__be16 udp_dport = mlxsw_sp->nve->config.udp_dport;
+	__be16 udp_dport = mlxsw_sp->nve->config->udp_dport;
 
 	__mlxsw_sp_nve_inc_parsing_depth_put(mlxsw_sp, udp_dport);
 }
@@ -270,7 +270,7 @@ err_config_set:
 
 static void mlxsw_sp1_nve_vxlan_fini(struct mlxsw_sp_nve *nve)
 {
-	struct mlxsw_sp_nve_config *config = &nve->config;
+	struct mlxsw_sp_nve_config *config = nve->config;
 	struct mlxsw_sp *mlxsw_sp = nve->mlxsw_sp;
 
 	mlxsw_sp_router_nve_demote_decap(mlxsw_sp, config->ul_tb_id,
@@ -305,6 +305,7 @@ const struct mlxsw_sp_nve_ops mlxsw_sp1_nve_vxlan_ops = {
 	.fini		= mlxsw_sp1_nve_vxlan_fini,
 	.fdb_replay	= mlxsw_sp_nve_vxlan_fdb_replay,
 	.fdb_clear_offload = mlxsw_sp_nve_vxlan_clear_offload,
+	.config_size	= sizeof(struct mlxsw_sp_nve_config),
 };
 
 static bool mlxsw_sp2_nve_vxlan_learning_set(struct mlxsw_sp *mlxsw_sp,
@@ -453,7 +454,7 @@ err_config_set:
 
 static void mlxsw_sp2_nve_vxlan_fini(struct mlxsw_sp_nve *nve)
 {
-	struct mlxsw_sp_nve_config *config = &nve->config;
+	struct mlxsw_sp_nve_config *config = nve->config;
 	struct mlxsw_sp *mlxsw_sp = nve->mlxsw_sp;
 
 	mlxsw_sp_router_nve_demote_decap(mlxsw_sp, config->ul_tb_id,
@@ -470,4 +471,5 @@ const struct mlxsw_sp_nve_ops mlxsw_sp2_nve_vxlan_ops = {
 	.fini		= mlxsw_sp2_nve_vxlan_fini,
 	.fdb_replay	= mlxsw_sp_nve_vxlan_fdb_replay,
 	.fdb_clear_offload = mlxsw_sp_nve_vxlan_clear_offload,
+	.config_size	= sizeof(struct mlxsw_sp_nve_config),
 };

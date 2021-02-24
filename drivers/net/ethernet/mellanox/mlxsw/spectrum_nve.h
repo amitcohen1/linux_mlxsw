@@ -22,7 +22,7 @@ struct mlxsw_sp_nve_config {
 };
 
 struct mlxsw_sp_nve {
-	struct mlxsw_sp_nve_config config;
+	struct mlxsw_sp_nve_config *config;
 	struct rhashtable mc_list_ht;
 	struct mlxsw_sp *mlxsw_sp;
 	const struct mlxsw_sp_nve_ops **nve_ops_arr;
@@ -47,6 +47,7 @@ struct mlxsw_sp_nve_ops {
 	int (*fdb_replay)(const struct net_device *nve_dev, __be32 vni,
 			  struct netlink_ext_ack *extack);
 	void (*fdb_clear_offload)(const struct net_device *nve_dev, __be32 vni);
+	size_t config_size;
 };
 
 extern const struct mlxsw_sp_nve_ops mlxsw_sp1_nve_vxlan_ops;
