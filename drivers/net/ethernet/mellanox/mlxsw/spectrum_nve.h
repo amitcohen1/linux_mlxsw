@@ -18,6 +18,10 @@ struct mlxsw_sp_nve_config {
 	u32 ul_tb_id;
 	enum mlxsw_sp_l3proto ul_proto;
 	union mlxsw_sp_l3addr ul_sip;
+};
+
+struct mlxsw_sp1_nve_config {
+	struct mlxsw_sp_nve_config common;
 	u16 ethertype;
 };
 
