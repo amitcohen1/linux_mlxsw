@@ -2520,6 +2520,14 @@ static int mlxsw_sp_basic_trap_groups_set(struct mlxsw_core *mlxsw_core)
 	return mlxsw_reg_write(mlxsw_core, MLXSW_REG(htgt), htgt_pl);
 }
 
+static const struct mlxsw_sp_switchdev_ops mlxsw_sp1_switchdev_ops = {
+	.switchdev_init	= mlxsw_sp1_switchdev_init,
+};
+
+static const struct mlxsw_sp_switchdev_ops mlxsw_sp2_switchdev_ops = {
+	.switchdev_init	= mlxsw_sp2_switchdev_init,
+};
+
 static const struct mlxsw_sp_ptp_ops mlxsw_sp1_ptp_ops = {
 	.clock_init	= mlxsw_sp1_ptp_clock_init,
 	.clock_fini	= mlxsw_sp1_ptp_clock_fini,
@@ -2624,7 +2632,7 @@ static int mlxsw_sp_init(struct mlxsw_core *mlxsw_core,
 		goto err_span_init;
 	}
 
-	err = mlxsw_sp_switchdev_init(mlxsw_sp);
+	err = mlxsw_sp->switchdev_ops->switchdev_init(mlxsw_sp);
 	if (err) {
 		dev_err(mlxsw_sp->bus_info->dev, "Failed to initialize switchdev\n");
 		goto err_switchdev_init;
@@ -2764,6 +2772,7 @@ static int mlxsw_sp1_init(struct mlxsw_core *mlxsw_core,
 {
 	struct mlxsw_sp *mlxsw_sp = mlxsw_core_driver_priv(mlxsw_core);
 
+	mlxsw_sp->switchdev_ops = &mlxsw_sp1_switchdev_ops;
 	mlxsw_sp->kvdl_ops = &mlxsw_sp1_kvdl_ops;
 	mlxsw_sp->afa_ops = &mlxsw_sp1_act_afa_ops;
 	mlxsw_sp->afk_ops = &mlxsw_sp1_afk_ops;
@@ -2794,6 +2803,7 @@ static int mlxsw_sp2_init(struct mlxsw_core *mlxsw_core,
 {
 	struct mlxsw_sp *mlxsw_sp = mlxsw_core_driver_priv(mlxsw_core);
 
+	mlxsw_sp->switchdev_ops = &mlxsw_sp2_switchdev_ops;
 	mlxsw_sp->kvdl_ops = &mlxsw_sp2_kvdl_ops;
 	mlxsw_sp->afa_ops = &mlxsw_sp2_act_afa_ops;
 	mlxsw_sp->afk_ops = &mlxsw_sp2_afk_ops;
@@ -2822,6 +2832,7 @@ static int mlxsw_sp3_init(struct mlxsw_core *mlxsw_core,
 {
 	struct mlxsw_sp *mlxsw_sp = mlxsw_core_driver_priv(mlxsw_core);
 
+	mlxsw_sp->switchdev_ops = &mlxsw_sp2_switchdev_ops;
 	mlxsw_sp->kvdl_ops = &mlxsw_sp2_kvdl_ops;
 	mlxsw_sp->afa_ops = &mlxsw_sp2_act_afa_ops;
 	mlxsw_sp->afk_ops = &mlxsw_sp2_afk_ops;

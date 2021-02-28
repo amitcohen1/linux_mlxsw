@@ -2296,9 +2296,62 @@ mlxsw_sp_bridge_8021ad_vxlan_join(struct mlxsw_sp_bridge_device *bridge_device,
 						     vid, ETH_P_8021AD, extack);
 }
 
-static const struct mlxsw_sp_bridge_ops mlxsw_sp_bridge_8021ad_ops = {
+static const struct mlxsw_sp_bridge_ops mlxsw_sp1_bridge_8021ad_ops = {
 	.port_join	= mlxsw_sp_bridge_8021ad_port_join,
 	.port_leave	= mlxsw_sp_bridge_8021ad_port_leave,
+	.vxlan_join	= mlxsw_sp_bridge_8021ad_vxlan_join,
+	.fid_get	= mlxsw_sp_bridge_8021q_fid_get,
+	.fid_lookup	= mlxsw_sp_bridge_8021q_fid_lookup,
+	.fid_vid	= mlxsw_sp_bridge_8021q_fid_vid,
+};
+
+static int
+mlxsw_sp2_bridge_8021ad_port_join(struct mlxsw_sp_bridge_device *bridge_device,
+				  struct mlxsw_sp_bridge_port *bridge_port,
+				  struct mlxsw_sp_port *mlxsw_sp_port,
+				  struct netlink_ext_ack *extack)
+{
+	struct mlxsw_sp *mlxsw_sp = mlxsw_sp_port->mlxsw_sp;
+	char spevet_pl[MLXSW_REG_SPEVET_LEN] = {};
+	int err;
+
+	err = mlxsw_sp_port_vlan_classification_set(mlxsw_sp_port, true, false);
+	if (err)
+		return err;
+
+	err = mlxsw_sp_bridge_vlan_aware_port_join(bridge_port, mlxsw_sp_port,
+						   extack);
+	if (err)
+		goto err_bridge_vlan_aware_port_join;
+
+	mlxsw_reg_spevet_local_port_set(spevet_pl, mlxsw_sp_port->local_port);
+	mlxsw_reg_spevet_et_vlan_set(spevet_pl, 1);
+	return mlxsw_reg_write(mlxsw_sp->core, MLXSW_REG(spevet), spevet_pl);
+
+err_bridge_vlan_aware_port_join:
+	mlxsw_sp_port_vlan_classification_set(mlxsw_sp_port, false, true);
+	return err;
+}
+
+static void
+mlxsw_sp2_bridge_8021ad_port_leave(struct mlxsw_sp_bridge_device *bridge_device,
+				   struct mlxsw_sp_bridge_port *bridge_port,
+				   struct mlxsw_sp_port *mlxsw_sp_port)
+{
+	struct mlxsw_sp *mlxsw_sp = mlxsw_sp_port->mlxsw_sp;
+	char spevet_pl[MLXSW_REG_SPEVET_LEN] = {};
+
+	mlxsw_reg_spevet_local_port_set(spevet_pl, mlxsw_sp_port->local_port);
+	mlxsw_reg_spevet_et_vlan_set(spevet_pl, 0);
+	mlxsw_reg_write(mlxsw_sp->core, MLXSW_REG(spevet), spevet_pl);
+
+	mlxsw_sp_bridge_vlan_aware_port_leave(mlxsw_sp_port);
+	mlxsw_sp_port_vlan_classification_set(mlxsw_sp_port, false, true);
+}
+
+static const struct mlxsw_sp_bridge_ops mlxsw_sp2_bridge_8021ad_ops = {
+	.port_join	= mlxsw_sp2_bridge_8021ad_port_join,
+	.port_leave	= mlxsw_sp2_bridge_8021ad_port_leave,
 	.vxlan_join	= mlxsw_sp_bridge_8021ad_vxlan_join,
 	.fid_get	= mlxsw_sp_bridge_8021q_fid_get,
 	.fid_lookup	= mlxsw_sp_bridge_8021q_fid_lookup,
@@ -3547,9 +3600,35 @@ int mlxsw_sp_switchdev_init(struct mlxsw_sp *mlxsw_sp)
 
 	INIT_LIST_HEAD(&mlxsw_sp->bridge->bridges_list);
 
-	bridge->bridge_8021q_ops = &mlxsw_sp_bridge_8021q_ops;
-	bridge->bridge_8021d_ops = &mlxsw_sp_bridge_8021d_ops;
-	bridge->bridge_8021ad_ops = &mlxsw_sp_bridge_8021ad_ops;
+	return 0;
+}
+
+int mlxsw_sp1_switchdev_init(struct mlxsw_sp *mlxsw_sp)
+{
+	int err;
+
+	err = mlxsw_sp_switchdev_init(mlxsw_sp);
+	if (err)
+		return err;
+
+	mlxsw_sp->bridge->bridge_8021q_ops = &mlxsw_sp_bridge_8021q_ops;
+	mlxsw_sp->bridge->bridge_8021d_ops = &mlxsw_sp_bridge_8021d_ops;
+	mlxsw_sp->bridge->bridge_8021ad_ops = &mlxsw_sp1_bridge_8021ad_ops;
+
+	return mlxsw_sp_fdb_init(mlxsw_sp);
+}
+
+int mlxsw_sp2_switchdev_init(struct mlxsw_sp *mlxsw_sp)
+{
+	int err;
+
+	err = mlxsw_sp_switchdev_init(mlxsw_sp);
+	if (err)
+		return err;
+
+	mlxsw_sp->bridge->bridge_8021q_ops = &mlxsw_sp_bridge_8021q_ops;
+	mlxsw_sp->bridge->bridge_8021d_ops = &mlxsw_sp_bridge_8021d_ops;
+	mlxsw_sp->bridge->bridge_8021ad_ops = &mlxsw_sp2_bridge_8021ad_ops;
 
 	return mlxsw_sp_fdb_init(mlxsw_sp);
 }

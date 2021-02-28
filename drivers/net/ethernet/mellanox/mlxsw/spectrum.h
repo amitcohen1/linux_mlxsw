@@ -164,6 +164,7 @@ struct mlxsw_sp {
 	struct mlxsw_sp_counter_pool *counter_pool;
 	struct mlxsw_sp_span *span;
 	struct mlxsw_sp_trap *trap;
+	const struct mlxsw_sp_switchdev_ops *switchdev_ops;
 	const struct mlxsw_sp_kvdl_ops *kvdl_ops;
 	const struct mlxsw_afa_ops *afa_ops;
 	const struct mlxsw_afk_ops *afk_ops;
@@ -183,6 +184,10 @@ struct mlxsw_sp {
 	const struct mlxsw_listener *listeners;
 	size_t listeners_count;
 	u32 lowest_shaper_bs;
+};
+
+struct mlxsw_sp_switchdev_ops {
+	int (*switchdev_init)(struct mlxsw_sp *mlxsw_sp);
 };
 
 struct mlxsw_sp_ptp_ops {
@@ -543,7 +548,8 @@ extern const struct mlxsw_sp_sb_ops mlxsw_sp2_sb_ops;
 extern const struct mlxsw_sp_sb_ops mlxsw_sp3_sb_ops;
 
 /* spectrum_switchdev.c */
-int mlxsw_sp_switchdev_init(struct mlxsw_sp *mlxsw_sp);
+int mlxsw_sp1_switchdev_init(struct mlxsw_sp *mlxsw_sp);
+int mlxsw_sp2_switchdev_init(struct mlxsw_sp *mlxsw_sp);
 void mlxsw_sp_switchdev_fini(struct mlxsw_sp *mlxsw_sp);
 int mlxsw_sp_rif_fdb_op(struct mlxsw_sp *mlxsw_sp, const char *mac, u16 fid,
 			bool adding);
