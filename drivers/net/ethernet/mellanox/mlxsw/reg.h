@@ -868,6 +868,38 @@ static inline void mlxsw_reg_spvid_pack(char *payload, u8 local_port, u16 pvid,
 	mlxsw_reg_spvid_et_vlan_set(payload, et_vlan);
 }
 
+/* SPEVET - Switch Port VID
+ * -----------------------
+ * The switch port VID configures the default VID for a port.
+ */
+#define MLXSW_REG_SPEVET_ID 0x202A
+#define MLXSW_REG_SPEVET_LEN 0x08
+
+MLXSW_REG_DEFINE(spevet, MLXSW_REG_SPEVET_ID, MLXSW_REG_SPEVET_LEN);
+
+/* reg_spvid_tport
+ * Port is tunnel port.
+ * Reserved when SwitchX/-2 or Spectrum-1.
+ * Access: Index
+ */
+MLXSW_ITEM32(reg, spevet, tport, 0x00, 24, 1);
+
+/* reg_spvid_local_port
+ * When tport = 0: Local port number. Not supported for CPU port.
+ * When tport = 1: Tunnel port.
+ * Access: Index
+ */
+MLXSW_ITEM32(reg, spevet, local_port, 0x00, 16, 8);
+
+/* reg_spvid_et_vlan
+ * Egress ethertype VLAN when SPVID.egr_et_set field set for the packet:
+ * 0: ether_type0 - (default)
+ * 1: ether_type1
+ * 2: ether_type2
+ * Access: RW
+ */
+MLXSW_ITEM32(reg, spevet, et_vlan, 0x04, 16, 2);
+
 /* SPVM - Switch Port VLAN Membership
  * ----------------------------------
  * The Switch Port VLAN Membership register configures the VLAN membership
@@ -12033,6 +12065,7 @@ static const struct mlxsw_reg_info *mlxsw_reg_infos[] = {
 	MLXSW_REG(sfn),
 	MLXSW_REG(spms),
 	MLXSW_REG(spvid),
+	MLXSW_REG(spevet),
 	MLXSW_REG(spvm),
 	MLXSW_REG(spaft),
 	MLXSW_REG(sfgc),
