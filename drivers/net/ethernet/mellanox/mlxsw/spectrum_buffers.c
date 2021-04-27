@@ -1583,6 +1583,7 @@ int mlxsw_sp_sb_occ_snapshot(struct mlxsw_core *mlxsw_core,
 {
 	struct mlxsw_sp *mlxsw_sp = mlxsw_core_driver_priv(mlxsw_core);
 	struct mlxsw_sp_sb_sr_occ_query_cb_ctx cb_ctx;
+	u8 expected_page, current_page = 0;
 	unsigned long cb_priv;
 	LIST_HEAD(bulk_list);
 	char *sbsr_pl;
@@ -1602,6 +1603,7 @@ next_batch:
 	local_port_1 = local_port;
 	masked_count = 0;
 	mlxsw_reg_sbsr_pack(sbsr_pl, false);
+	mlxsw_reg_sbsr_port_page_set(sbsr_pl, current_page);
 	for (i = 0; i < MLXSW_SP_SB_ING_TC_COUNT; i++)
 		mlxsw_reg_sbsr_pg_buff_mask_set(sbsr_pl, i, 1);
 	for (i = 0; i < MLXSW_SP_SB_EG_TC_COUNT; i++)
@@ -1609,6 +1611,11 @@ next_batch:
 	for (; local_port < mlxsw_core_max_ports(mlxsw_core); local_port++) {
 		if (!mlxsw_sp->ports[local_port])
 			continue;
+		expected_page = local_port / MLXSW_REG_SBSR_NUM_PORTS_IN_PAGE;
+		if (expected_page != current_page) {
+			current_page = expected_page;
+			goto do_query;
+		}
 		if (local_port != MLXSW_PORT_CPU_PORT) {
 			/* Ingress quotas are not supported for the CPU port */
 			mlxsw_reg_sbsr_ingress_port_mask_set(sbsr_pl,
@@ -1651,6 +1658,7 @@ int mlxsw_sp_sb_occ_max_clear(struct mlxsw_core *mlxsw_core,
 			      unsigned int sb_index)
 {
 	struct mlxsw_sp *mlxsw_sp = mlxsw_core_driver_priv(mlxsw_core);
+	u8 expected_page, current_page = 0;
 	LIST_HEAD(bulk_list);
 	char *sbsr_pl;
 	unsigned int masked_count;
@@ -1667,6 +1675,8 @@ int mlxsw_sp_sb_occ_max_clear(struct mlxsw_core *mlxsw_core,
 next_batch:
 	masked_count = 0;
 	mlxsw_reg_sbsr_pack(sbsr_pl, true);
+	mlxsw_reg_sbsr_port_page_set(sbsr_pl, current_page);
+
 	for (i = 0; i < MLXSW_SP_SB_ING_TC_COUNT; i++)
 		mlxsw_reg_sbsr_pg_buff_mask_set(sbsr_pl, i, 1);
 	for (i = 0; i < MLXSW_SP_SB_EG_TC_COUNT; i++)
@@ -1674,6 +1684,11 @@ next_batch:
 	for (; local_port < mlxsw_core_max_ports(mlxsw_core); local_port++) {
 		if (!mlxsw_sp->ports[local_port])
 			continue;
+		expected_page = local_port / MLXSW_REG_SBSR_NUM_PORTS_IN_PAGE;
+		if (expected_page != current_page) {
+			current_page = expected_page;
+			goto do_query;
+		}
 		if (local_port != MLXSW_PORT_CPU_PORT) {
 			/* Ingress quotas are not supported for the CPU port */
 			mlxsw_reg_sbsr_ingress_port_mask_set(sbsr_pl,
