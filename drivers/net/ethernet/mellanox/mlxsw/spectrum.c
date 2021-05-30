@@ -483,7 +483,7 @@ mlxsw_sp_port_system_port_mapping_set(struct mlxsw_sp_port *mlxsw_sp_port)
 }
 
 static int
-mlxsw_sp_port_module_info_get(struct mlxsw_sp *mlxsw_sp, u8 local_port,
+mlxsw_sp_port_module_info_get(struct mlxsw_sp *mlxsw_sp, u16 local_port,
 			      struct mlxsw_sp_port_mapping *port_mapping)
 {
 	char pmlp_pl[MLXSW_REG_PMLP_LEN];
@@ -1474,8 +1474,8 @@ mlxsw_sp_port_vlan_classification_set(struct mlxsw_sp_port *mlxsw_sp_port,
 }
 
 static int mlxsw_sp_port_label_info_get(struct mlxsw_sp *mlxsw_sp,
-					u8 local_port, u8 *port_number,
-					u8 *split_port_subnumber,
+					u16 local_port, u16 *port_number,
+					u16 *split_port_subnumber,
 					u8 *slot_index)
 {
 	char pllp_pl[MLXSW_REG_PLLP_LEN];
@@ -1490,16 +1490,16 @@ static int mlxsw_sp_port_label_info_get(struct mlxsw_sp *mlxsw_sp,
 	return 0;
 }
 
-static int mlxsw_sp_port_create(struct mlxsw_sp *mlxsw_sp, u8 local_port,
+static int mlxsw_sp_port_create(struct mlxsw_sp *mlxsw_sp, u16 local_port,
 				bool split,
 				struct mlxsw_sp_port_mapping *port_mapping)
 {
 	struct mlxsw_sp_port_vlan *mlxsw_sp_port_vlan;
 	struct mlxsw_sp_port *mlxsw_sp_port;
 	u32 lanes = port_mapping->width;
-	u8 split_port_subnumber;
+	u16 split_port_subnumber;
 	struct net_device *dev;
-	u8 port_number;
+	u16 port_number;
 	u8 slot_index;
 	bool splittable;
 	int err;
@@ -1781,7 +1781,7 @@ err_port_swid_set:
 	return err;
 }
 
-static void mlxsw_sp_port_remove(struct mlxsw_sp *mlxsw_sp, u8 local_port)
+static void mlxsw_sp_port_remove(struct mlxsw_sp *mlxsw_sp, u16 local_port)
 {
 	struct mlxsw_sp_port *mlxsw_sp_port = mlxsw_sp->ports[local_port];
 	u8 module = mlxsw_sp_port->mapping.module;
@@ -1848,12 +1848,12 @@ static void mlxsw_sp_cpu_port_remove(struct mlxsw_sp *mlxsw_sp)
 	kfree(mlxsw_sp_port);
 }
 
-static bool mlxsw_sp_local_port_valid(u8 local_port)
+static bool mlxsw_sp_local_port_valid(u16 local_port)
 {
 	return local_port != MLXSW_PORT_CPU_PORT;
 }
 
-static bool mlxsw_sp_port_created(struct mlxsw_sp *mlxsw_sp, u8 local_port)
+static bool mlxsw_sp_port_created(struct mlxsw_sp *mlxsw_sp, u16 local_port)
 {
 	if (!mlxsw_sp_local_port_valid(local_port))
 		return false;
@@ -2015,14 +2015,14 @@ static void mlxsw_sp_port_unsplit_create(struct mlxsw_sp *mlxsw_sp,
 }
 
 static struct mlxsw_sp_port *
-mlxsw_sp_port_get_by_local_port(struct mlxsw_sp *mlxsw_sp, u8 local_port)
+mlxsw_sp_port_get_by_local_port(struct mlxsw_sp *mlxsw_sp, u16 local_port)
 {
 	if (mlxsw_sp->ports && mlxsw_sp->ports[local_port])
 		return mlxsw_sp->ports[local_port];
 	return NULL;
 }
 
-static int mlxsw_sp_port_split(struct mlxsw_core *mlxsw_core, u8 local_port,
+static int mlxsw_sp_port_split(struct mlxsw_core *mlxsw_core, u16 local_port,
 			       unsigned int count,
 			       struct netlink_ext_ack *extack)
 {
@@ -2085,7 +2085,7 @@ err_port_split_create:
 	return err;
 }
 
-static int mlxsw_sp_port_unsplit(struct mlxsw_core *mlxsw_core, u8 local_port,
+static int mlxsw_sp_port_unsplit(struct mlxsw_core *mlxsw_core, u16 local_port,
 				 struct netlink_ext_ack *extack)
 {
 	struct mlxsw_sp *mlxsw_sp = mlxsw_core_driver_priv(mlxsw_core);
@@ -2148,7 +2148,7 @@ static void mlxsw_sp_pude_event_func(const struct mlxsw_reg_info *reg,
 	struct mlxsw_sp_port *mlxsw_sp_port;
 	enum mlxsw_reg_pude_oper_status status;
 	unsigned int max_ports;
-	u8 local_port;
+	u16 local_port;
 
 	max_ports = mlxsw_core_max_ports(mlxsw_sp->core);
 	local_port = mlxsw_reg_pude_local_port_get(pude_pl);
@@ -2174,7 +2174,7 @@ static void mlxsw_sp_pude_event_func(const struct mlxsw_reg_info *reg,
 static void mlxsw_sp1_ptp_fifo_event_func(struct mlxsw_sp *mlxsw_sp,
 					  char *mtpptr_pl, bool ingress)
 {
-	u8 local_port;
+	u16 local_port;
 	u8 num_rec;
 	int i;
 
@@ -2212,7 +2212,7 @@ static void mlxsw_sp1_ptp_egr_fifo_event_func(const struct mlxsw_reg_info *reg,
 }
 
 void mlxsw_sp_rx_listener_no_mark_func(struct sk_buff *skb,
-				       u8 local_port, void *priv)
+				       u16 local_port, void *priv)
 {
 	struct mlxsw_sp *mlxsw_sp = priv;
 	struct mlxsw_sp_port *mlxsw_sp_port = mlxsw_sp->ports[local_port];
@@ -2236,7 +2236,7 @@ void mlxsw_sp_rx_listener_no_mark_func(struct sk_buff *skb,
 	netif_receive_skb(skb);
 }
 
-static void mlxsw_sp_rx_listener_mark_func(struct sk_buff *skb, u8 local_port,
+static void mlxsw_sp_rx_listener_mark_func(struct sk_buff *skb, u16 local_port,
 					   void *priv)
 {
 	skb->offload_fwd_mark = 1;
@@ -2244,7 +2244,7 @@ static void mlxsw_sp_rx_listener_mark_func(struct sk_buff *skb, u8 local_port,
 }
 
 static void mlxsw_sp_rx_listener_l3_mark_func(struct sk_buff *skb,
-					      u8 local_port, void *priv)
+					      u16 local_port, void *priv)
 {
 	skb->offload_l3_fwd_mark = 1;
 	skb->offload_fwd_mark = 1;
@@ -2252,7 +2252,7 @@ static void mlxsw_sp_rx_listener_l3_mark_func(struct sk_buff *skb,
 }
 
 void mlxsw_sp_ptp_receive(struct mlxsw_sp *mlxsw_sp, struct sk_buff *skb,
-			  u8 local_port)
+			  u16 local_port)
 {
 	mlxsw_sp->ptp_ops->receive(mlxsw_sp, skb, local_port);
 }
@@ -3450,7 +3450,7 @@ static void mlxsw_sp2_params_unregister(struct mlxsw_core *mlxsw_core)
 }
 
 static void mlxsw_sp_ptp_transmitted(struct mlxsw_core *mlxsw_core,
-				     struct sk_buff *skb, u8 local_port)
+				     struct sk_buff *skb, u16 local_port)
 {
 	struct mlxsw_sp *mlxsw_sp = mlxsw_core_driver_priv(mlxsw_core);
 
