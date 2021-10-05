@@ -368,7 +368,7 @@ static int mlxsw_sp_port_mtu_set(struct mlxsw_sp_port *mlxsw_sp_port, u16 mtu)
 }
 
 static int mlxsw_sp_port_swid_set(struct mlxsw_sp *mlxsw_sp,
-				  u8 local_port, u8 swid)
+				  u16 local_port, u8 swid)
 {
 	char pspa_pl[MLXSW_REG_PSPA_LEN];
 
@@ -551,7 +551,7 @@ mlxsw_sp_port_module_info_get(struct mlxsw_sp *mlxsw_sp, u16 local_port,
 }
 
 static int
-mlxsw_sp_port_module_map(struct mlxsw_sp *mlxsw_sp, u8 local_port,
+mlxsw_sp_port_module_map(struct mlxsw_sp *mlxsw_sp, u16 local_port,
 			 const struct mlxsw_sp_port_mapping *port_mapping)
 {
 	char pmlp_pl[MLXSW_REG_PMLP_LEN];
@@ -576,7 +576,7 @@ err_pmlp_write:
 	return err;
 }
 
-static void mlxsw_sp_port_module_unmap(struct mlxsw_sp *mlxsw_sp, u8 local_port,
+static void mlxsw_sp_port_module_unmap(struct mlxsw_sp *mlxsw_sp, u16 local_port,
 				       u8 module)
 {
 	char pmlp_pl[MLXSW_REG_PMLP_LEN];
@@ -1987,7 +1987,7 @@ mlxsw_sp_port_split_create(struct mlxsw_sp *mlxsw_sp,
 	split_port_mapping = *port_mapping;
 	split_port_mapping.width /= count;
 	for (i = 0; i < count; i++) {
-		u8 s_local_port = mlxsw_reg_pmtdb_port_num_get(pmtdb_pl, i);
+		u16 s_local_port = mlxsw_reg_pmtdb_port_num_get(pmtdb_pl, i);
 
 		if (!mlxsw_sp_local_port_valid(s_local_port))
 			continue;
@@ -2003,7 +2003,7 @@ mlxsw_sp_port_split_create(struct mlxsw_sp *mlxsw_sp,
 
 err_port_create:
 	for (i--; i >= 0; i--) {
-		u8 s_local_port = mlxsw_reg_pmtdb_port_num_get(pmtdb_pl, i);
+		u16 s_local_port = mlxsw_reg_pmtdb_port_num_get(pmtdb_pl, i);
 
 		if (mlxsw_sp_port_created(mlxsw_sp, s_local_port))
 			mlxsw_sp_port_remove(mlxsw_sp, s_local_port);
@@ -2020,7 +2020,7 @@ static void mlxsw_sp_port_unsplit_create(struct mlxsw_sp *mlxsw_sp,
 
 	/* Go over original unsplit ports in the gap and recreate them. */
 	for (i = 0; i < count; i++) {
-		u8 local_port = mlxsw_reg_pmtdb_port_num_get(pmtdb_pl, i);
+		u16 local_port = mlxsw_reg_pmtdb_port_num_get(pmtdb_pl, i);
 
 		port_mapping = mlxsw_sp->port_mapping[local_port];
 		if (!port_mapping || !mlxsw_sp_local_port_valid(local_port))
@@ -2081,7 +2081,7 @@ static int mlxsw_sp_port_split(struct mlxsw_core *mlxsw_core, u16 local_port,
 	port_mapping = mlxsw_sp_port->mapping;
 
 	for (i = 0; i < count; i++) {
-		u8 s_local_port = mlxsw_reg_pmtdb_port_num_get(pmtdb_pl, i);
+		u16 s_local_port = mlxsw_reg_pmtdb_port_num_get(pmtdb_pl, i);
 
 		if (mlxsw_sp_port_created(mlxsw_sp, s_local_port))
 			mlxsw_sp_port_remove(mlxsw_sp, s_local_port);
@@ -2137,7 +2137,7 @@ static int mlxsw_sp_port_unsplit(struct mlxsw_core *mlxsw_core, u16 local_port,
 	}
 
 	for (i = 0; i < count; i++) {
-		u8 s_local_port = mlxsw_reg_pmtdb_port_num_get(pmtdb_pl, i);
+		u16 s_local_port = mlxsw_reg_pmtdb_port_num_get(pmtdb_pl, i);
 
 		if (mlxsw_sp_port_created(mlxsw_sp, s_local_port))
 			mlxsw_sp_port_remove(mlxsw_sp, s_local_port);
