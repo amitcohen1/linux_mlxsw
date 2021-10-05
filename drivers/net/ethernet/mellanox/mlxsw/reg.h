@@ -6015,7 +6015,7 @@ MLXSW_REG_DEFINE(pllp, MLXSW_REG_PLLP_ID, MLXSW_REG_PLLP_LEN);
  * Local port number.
  * Access: Index
  */
-MLXSW_ITEM32(reg, pllp, local_port, 0x00, 16, 8);
+MLXSW_ITEM32_LP(reg, pllp, 0x00, 16, 0x00, 12);
 
 /* reg_pllp_label_port
  * Front panel label of the port.
@@ -6035,7 +6035,7 @@ MLXSW_ITEM32(reg, pllp, split_num, 0x04, 0, 4);
  */
 MLXSW_ITEM32(reg, pllp, slot_index, 0x08, 0, 4);
 
-static inline void mlxsw_reg_pllp_pack(char *payload, u8 local_port)
+static inline void mlxsw_reg_pllp_pack(char *payload, u16 local_port)
 {
 	MLXSW_REG_ZERO(pllp, payload);
 	mlxsw_reg_pllp_local_port_set(payload, local_port);
