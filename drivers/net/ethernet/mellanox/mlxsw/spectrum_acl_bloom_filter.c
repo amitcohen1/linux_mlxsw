@@ -66,7 +66,7 @@ static const u8 chunk_key_offsets[MLXSW_BLOOM_KEY_CHUNKS] = {2, 20, 38};
  * which is 0x8529 (1 + x^3 + x^5 + x^8 + x^10 + x^15 and
  * the implicit x^16).
  */
-static const u16 mlxsw_sp_acl_bf_crc_tab[256] = {
+static const u16 mlxsw_sp_acl_bf_crc16_tab[256] = {
 0x0000, 0x8529, 0x8f7b, 0x0a52, 0x9bdf, 0x1ef6, 0x14a4, 0x918d,
 0xb297, 0x37be, 0x3dec, 0xb8c5, 0x2948, 0xac61, 0xa633, 0x231a,
 0xe007, 0x652e, 0x6f7c, 0xea55, 0x7bd8, 0xfef1, 0xf4a3, 0x718a,
@@ -101,9 +101,9 @@ static const u16 mlxsw_sp_acl_bf_crc_tab[256] = {
 0x0c4c, 0x8965, 0x8337, 0x061e, 0x9793, 0x12ba, 0x18e8, 0x9dc1,
 };
 
-static u16 mlxsw_sp_acl_bf_crc_byte(u16 crc, u8 c)
+static u16 mlxsw_sp_acl_bf_crc16_byte(u16 crc, u8 c)
 {
-	return (crc << 8) ^ mlxsw_sp_acl_bf_crc_tab[(crc >> 8) ^ c];
+	return (crc << 8) ^ mlxsw_sp_acl_bf_crc16_tab[(crc >> 8) ^ c];
 }
 
 static u16 mlxsw_sp_acl_bf_crc(const u8 *buffer, size_t len)
@@ -111,14 +111,15 @@ static u16 mlxsw_sp_acl_bf_crc(const u8 *buffer, size_t len)
 	u16 crc = 0;
 
 	while (len--)
-		crc = mlxsw_sp_acl_bf_crc_byte(crc, *buffer++);
+		crc = mlxsw_sp_acl_bf_crc16_byte(crc, *buffer++);
 	return crc;
 }
 
 static void
-mlxsw_sp_acl_bf_key_encode(struct mlxsw_sp_acl_atcam_region *aregion,
-			   struct mlxsw_sp_acl_atcam_entry *aentry,
-			   char *output, u8 *len)
+__mlxsw_sp_acl_bf_key_encode(struct mlxsw_sp_acl_atcam_region *aregion,
+			     struct mlxsw_sp_acl_atcam_entry *aentry,
+			     char *output, u8 *len, u8 max_chunks, u8 pad_bytes,
+			     u8 key_offset, u8 chunk_key_len, u8 chunk_len)
 {
 	struct mlxsw_afk_key_info *key_info = aregion->region->key_info;
 	u8 chunk_index, chunk_count, block_count;
@@ -129,25 +130,30 @@ mlxsw_sp_acl_bf_key_encode(struct mlxsw_sp_acl_atcam_region *aregion,
 	chunk_count = 1 + ((block_count - 1) >> 2);
 	erp_region_id = cpu_to_be16(aentry->ht_key.erp_id |
 				   (aregion->region->id << 4));
-	for (chunk_index = MLXSW_BLOOM_KEY_CHUNKS - chunk_count;
-	     chunk_index < MLXSW_BLOOM_KEY_CHUNKS; chunk_index++) {
-		memset(chunk, 0, MLXSW_BLOOM_CHUNK_PAD_BYTES);
-		memcpy(chunk + MLXSW_BLOOM_CHUNK_PAD_BYTES, &erp_region_id,
+	for (chunk_index = max_chunks - chunk_count; chunk_index < max_chunks;
+	     chunk_index++) {
+		memset(chunk, 0, pad_bytes);
+		memcpy(chunk + pad_bytes, &erp_region_id,
 		       sizeof(erp_region_id));
-		memcpy(chunk + MLXSW_BLOOM_CHUNK_KEY_OFFSET,
+		memcpy(chunk + key_offset,
 		       &aentry->enc_key[chunk_key_offsets[chunk_index]],
-		       MLXSW_BLOOM_CHUNK_KEY_BYTES);
-		chunk += MLXSW_BLOOM_KEY_CHUNK_BYTES;
+		       chunk_key_len);
+		chunk += chunk_len;
 	}
-	*len = chunk_count * MLXSW_BLOOM_KEY_CHUNK_BYTES;
+	*len = chunk_count * chunk_len;
 }
 
-static unsigned int
-mlxsw_sp_acl_bf_rule_count_index_get(struct mlxsw_sp_acl_bf *bf,
-				     unsigned int erp_bank,
-				     unsigned int bf_index)
+static void
+mlxsw_sp_acl_bf_key_encode(struct mlxsw_sp_acl_atcam_region *aregion,
+			   struct mlxsw_sp_acl_atcam_entry *aentry,
+			   char *output, u8 *len)
 {
-	return erp_bank * bf->bank_size + bf_index;
+	__mlxsw_sp_acl_bf_key_encode(aregion, aentry, output, len,
+				     MLXSW_BLOOM_KEY_CHUNKS,
+				     MLXSW_BLOOM_CHUNK_PAD_BYTES,
+				     MLXSW_BLOOM_CHUNK_KEY_OFFSET,
+				     MLXSW_BLOOM_CHUNK_KEY_BYTES,
+				     MLXSW_BLOOM_KEY_CHUNK_BYTES);
 }
 
 static unsigned int
@@ -160,6 +166,14 @@ mlxsw_sp_acl_bf_index_get(struct mlxsw_sp_acl_bf *bf,
 
 	mlxsw_sp_acl_bf_key_encode(aregion, aentry, bf_key, &bf_size);
 	return mlxsw_sp_acl_bf_crc(bf_key, bf_size);
+}
+
+static unsigned int
+mlxsw_sp_acl_bf_rule_count_index_get(struct mlxsw_sp_acl_bf *bf,
+				     unsigned int erp_bank,
+				     unsigned int bf_index)
+{
+	return erp_bank * bf->bank_size + bf_index;
 }
 
 int
@@ -176,7 +190,7 @@ mlxsw_sp_acl_bf_entry_add(struct mlxsw_sp *mlxsw_sp,
 
 	mutex_lock(&bf->lock);
 
-	bf_index = mlxsw_sp_acl_bf_index_get(bf, aregion, aentry);
+	bf_index = mlxsw_sp->acl_bf_ops->index_get(bf, aregion, aentry);
 	rule_index = mlxsw_sp_acl_bf_rule_count_index_get(bf, erp_bank,
 							  bf_index);
 
@@ -219,7 +233,7 @@ mlxsw_sp_acl_bf_entry_del(struct mlxsw_sp *mlxsw_sp,
 
 	mutex_lock(&bf->lock);
 
-	bf_index = mlxsw_sp_acl_bf_index_get(bf, aregion, aentry);
+	bf_index = mlxsw_sp->acl_bf_ops->index_get(bf, aregion, aentry);
 	rule_index = mlxsw_sp_acl_bf_rule_count_index_get(bf, erp_bank,
 							  bf_index);
 
@@ -267,3 +281,7 @@ void mlxsw_sp_acl_bf_fini(struct mlxsw_sp_acl_bf *bf)
 	mutex_destroy(&bf->lock);
 	kfree(bf);
 }
+
+const struct mlxsw_sp_acl_bf_ops mlxsw_sp_acl_bf_ops = {
+	.index_get = mlxsw_sp_acl_bf_index_get,
+};
