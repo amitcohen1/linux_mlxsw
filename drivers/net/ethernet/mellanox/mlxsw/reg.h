@@ -322,6 +322,19 @@ MLXSW_ITEM32_INDEXED(reg, sfd, rec_action, MLXSW_REG_SFD_BASE_LEN, 28, 4,
 MLXSW_ITEM32_INDEXED(reg, sfd, uc_sub_port, MLXSW_REG_SFD_BASE_LEN, 16, 8,
 		     MLXSW_REG_SFD_REC_LEN, 0x08, false);
 
+/* reg_sfd_uc_set_vid
+ * Set VID.
+ * 0 - do not update VID.
+ * 1 - set VID.
+ * For Spectrum-2 when set_vid=0 and smpe_valid=1 then the
+ * smpe will modify the vid.
+ * Access: RW
+ *
+ * Note: Reserved when ubridge=0.
+ */
+MLXSW_ITEM32_INDEXED(reg, sfd, uc_set_vid, MLXSW_REG_SFD_BASE_LEN, 31, 1,
+		     MLXSW_REG_SFD_REC_LEN, 0x08, false);
+
 /* reg_sfd_uc_fid_vid
  * Filtering ID or VLAN ID
  * For SwitchX and SwitchX-2:
@@ -334,6 +347,16 @@ MLXSW_ITEM32_INDEXED(reg, sfd, uc_sub_port, MLXSW_REG_SFD_BASE_LEN, 16, 8,
  */
 MLXSW_ITEM32_INDEXED(reg, sfd, uc_fid_vid, MLXSW_REG_SFD_BASE_LEN, 0, 16,
 		     MLXSW_REG_SFD_REC_LEN, 0x08, false);
+
+/* reg_sfd_uc_vid
+ * New VID when set_vid = 1.
+ * Reserved when set_vid = 0.
+ * Access: RW
+ *
+ * Note: Reserved when ubridge=0.
+ */
+MLXSW_ITEM32_INDEXED(reg, sfd, uc_vid, MLXSW_REG_SFD_BASE_LEN, 16, 12,
+		     MLXSW_REG_SFD_REC_LEN, 0x0C, false);
 
 /* reg_sfd_uc_system_port
  * Unique port identifier for the final destination of the packet.
@@ -379,6 +402,19 @@ static inline void mlxsw_reg_sfd_uc_pack(char *payload, int rec_index,
 MLXSW_ITEM32_INDEXED(reg, sfd, uc_lag_sub_port, MLXSW_REG_SFD_BASE_LEN, 16, 8,
 		     MLXSW_REG_SFD_REC_LEN, 0x08, false);
 
+/* reg_sfd_uc_lag_set_vid
+ * Set VID.
+ * 0 - do not update VID.
+ * 1 - set VID.
+ * For Spectrum-2 when set_vid=0 and smpe_valid=1 then the
+ * smpe will modify the vid.
+ * Access: RW
+ *
+ * Note: Reserved when ubridge=0.
+ */
+MLXSW_ITEM32_INDEXED(reg, sfd, uc_lag_set_vid, MLXSW_REG_SFD_BASE_LEN, 31, 1,
+		     MLXSW_REG_SFD_REC_LEN, 0x08, false);
+
 /* reg_sfd_uc_lag_fid_vid
  * Filtering ID or VLAN ID
  * For SwitchX and SwitchX-2:
@@ -394,6 +430,7 @@ MLXSW_ITEM32_INDEXED(reg, sfd, uc_lag_fid_vid, MLXSW_REG_SFD_BASE_LEN, 0, 16,
 
 /* reg_sfd_uc_lag_lag_vid
  * Indicates VID in case of vFIDs. Reserved for FIDs.
+ * When ubridge=1, it is reserved when set_vid=0.
  * Access: RW
  */
 MLXSW_ITEM32_INDEXED(reg, sfd, uc_lag_lag_vid, MLXSW_REG_SFD_BASE_LEN, 16, 12,
