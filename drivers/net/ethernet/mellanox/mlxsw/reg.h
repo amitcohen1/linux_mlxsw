@@ -1819,6 +1819,27 @@ MLXSW_ITEM32(reg, sfmr, vv, 0x10, 31, 1);
  */
 MLXSW_ITEM32(reg, sfmr, vni, 0x10, 0, 24);
 
+/* reg_sfmr_irif_v
+ * Ingress RIF valid.
+ * 0 - irif is not valid, no irif assigned.
+ * 1 - irif valid.
+ * Must not be set for a non valid RIF.
+ * Access: RW
+ *
+ * Note: Reserved when ubridge = 0.
+ */
+MLXSW_ITEM32(reg, sfmr, irif_v, 0x14, 24, 1);
+
+/* reg_sfmr_irif
+ * Ingress RIF (Router Interface).
+ * Range is 0..cap_max_router_interfaces-1.
+ * Reserved when irif_v = 0.
+ * Access: RW
+ *
+ * Note: Reserved when ubridge = 0.
+ */
+MLXSW_ITEM32(reg, sfmr, irif, 0x14, 0, 16);
+
 static inline void mlxsw_reg_sfmr_pack(char *payload,
 				       enum mlxsw_reg_sfmr_op op, u16 fid,
 				       u16 fid_offset)
