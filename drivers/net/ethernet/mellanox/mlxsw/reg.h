@@ -1586,6 +1586,27 @@ MLXSW_ITEM32(reg, svfa, counter_set_type, 0x08, 24, 8);
  */
 MLXSW_ITEM32(reg, svfa, counter_index, 0x08, 0, 24);
 
+/* reg_svfa_irif_v
+ * Ingress RIF valid.
+ * 0 - irif is not valid, no irif assigned.
+ * 1 - irif valid.
+ * Must not be set for a non enabled RIF.
+ * Access: RW
+ *
+ * Note: Reserved when ubridge = 0.
+ */
+MLXSW_ITEM32(reg, svfa, irif_v, 0x14, 24, 1);
+
+/* reg_svfa_irif
+ * Ingress RIF (Router Interface).
+ * Range is 0..cap_max_router_interfaces-1.
+ * Reserved when irif_v = 0.
+ * Access: RW
+ *
+ * Note: Reserved when ubridge = 0.
+ */
+MLXSW_ITEM32(reg, svfa, irif, 0x14, 0, 16);
+
 static inline void mlxsw_reg_svfa_pack(char *payload, u16 local_port,
 				       enum mlxsw_reg_svfa_mt mt, bool valid,
 				       u16 fid, u16 vid)
