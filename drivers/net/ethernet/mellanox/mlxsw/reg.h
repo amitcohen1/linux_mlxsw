@@ -1898,6 +1898,27 @@ MLXSW_ITEM32(reg, sfmr, irif_v, 0x14, 24, 1);
  */
 MLXSW_ITEM32(reg, sfmr, irif, 0x14, 0, 16);
 
+/* reg_sfmr_smpe_valid
+ * SMPE is valid.
+ * Reserved when flood_rsp = 1.
+ * Reserved for Spectrum-1.
+ * Access: RW
+ *
+ * Note: Reserved when ubridge = 0.
+ */
+MLXSW_ITEM32(reg, sfmr, smpe_valid, 0x28, 20, 1);
+
+/* reg_sfmr_smpe
+ * Switch multicast port to egress VID.
+ * Range is 0..cap_max_rmpe-1
+ * Reserved when flood_rsp = 1.
+ * Reserved for Spectrum-1.
+ * Access: RW
+ *
+ * Note: Reserved when ubridge = 0.
+ */
+MLXSW_ITEM32(reg, sfmr, smpe, 0x28, 0, 16);
+
 static inline void mlxsw_reg_sfmr_pack(char *payload,
 				       enum mlxsw_reg_sfmr_op op, u16 fid,
 				       u16 fid_offset)
@@ -1908,6 +1929,16 @@ static inline void mlxsw_reg_sfmr_pack(char *payload,
 	mlxsw_reg_sfmr_fid_offset_set(payload, fid_offset);
 	mlxsw_reg_sfmr_vtfp_set(payload, false);
 	mlxsw_reg_sfmr_vv_set(payload, false);
+}
+
+static inline void mlxsw_reg_sfmr_smpe_pack(char *payload,
+					    enum mlxsw_reg_sfmr_op op, u16 fid,
+					    u16 fid_offset, bool smpe_valid,
+					    u16 smpe)
+{
+	mlxsw_reg_sfmr_pack(payload, op, fid, fid_offset);
+	mlxsw_reg_sfmr_smpe_valid_set(payload, smpe_valid);
+	mlxsw_reg_sfmr_smpe_set(payload, smpe);
 }
 
 /* SPVMLR - Switch Port VLAN MAC Learning Register
