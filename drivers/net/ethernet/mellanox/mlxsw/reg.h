@@ -1624,6 +1624,13 @@ MLXSW_ITEM32(reg, svfa, counter_set_type, 0x08, 24, 8);
  */
 MLXSW_ITEM32(reg, svfa, counter_index, 0x08, 0, 24);
 
+/* reg_svfa_vni
+ * Virtual Network Identifier.
+ * Reserved when mapping_table is not 2 (VNI mapping table).
+ * Access: Index
+ */
+MLXSW_ITEM32(reg, svfa, vni, 0x10, 0, 24);
+
 /* reg_svfa_irif_v
  * Ingress RIF valid.
  * 0 - irif is not valid, no irif assigned.
@@ -1883,9 +1890,9 @@ MLXSW_ITEM32(reg, sfmr, vv, 0x10, 31, 1);
 
 /* reg_sfmr_vni
  * Virtual Network Identifier.
+ * When ubridge = 0: A given VNI can only be assigned to one FID.
+ * When ubridge = 1: Configures only the FID->VNI, the VNI->FID is done by SVFA.
  * Access: RW
- *
- * Note: A given VNI can only be assigned to one FID.
  */
 MLXSW_ITEM32(reg, sfmr, vni, 0x10, 0, 24);
 
