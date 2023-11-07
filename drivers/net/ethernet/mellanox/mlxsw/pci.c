@@ -92,6 +92,7 @@ struct mlxsw_pci_queue {
 			u32 ev_other_count;
 		} eq;
 	} u;
+	struct napi_struct napi;
 };
 
 struct mlxsw_pci_queue_type_group {
@@ -130,6 +131,7 @@ struct mlxsw_pci {
 	const struct pci_device_id *id;
 	enum mlxsw_pci_cqe_v max_cqe_ver; /* Maximal supported CQE version */
 	u8 num_sdq_cqs; /* Number of CQs used for SDQs */
+	struct net_device dummy_dev;
 };
 
 static void mlxsw_pci_queue_tasklet_schedule(struct mlxsw_pci_queue *q)
@@ -711,6 +713,52 @@ static char *mlxsw_pci_cq_sw_cqe_get(struct mlxsw_pci_queue *q)
 	return elem;
 }
 
+static int mlxsw_pci_napi_poll(struct napi_struct *napi, int budget)
+{
+	struct mlxsw_pci_queue *q = container_of(napi, struct mlxsw_pci_queue,
+						 napi);
+	struct mlxsw_pci *mlxsw_pci = q->pci;
+	char *cqe;
+	int items = 0;
+	int credits = budget;
+	//int credits = q->count >> 1;
+
+	while ((cqe = mlxsw_pci_cq_sw_cqe_get(q))) {
+		u16 wqe_counter = mlxsw_pci_cqe_wqe_counter_get(cqe);
+		u8 sendq = mlxsw_pci_cqe_sr_get(q->u.cq.v, cqe);
+		u8 dqn = mlxsw_pci_cqe_dqn_get(q->u.cq.v, cqe);
+		char ncqe[MLXSW_PCI_CQE_SIZE_MAX];
+
+		memcpy(ncqe, cqe, q->elem_size);
+		mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
+
+		if (sendq) {
+			struct mlxsw_pci_queue *sdq;
+
+			sdq = mlxsw_pci_sdq_get(mlxsw_pci, dqn);
+			mlxsw_pci_cqe_sdq_handle(mlxsw_pci, sdq,
+						 wqe_counter, q->u.cq.v, ncqe);
+			q->u.cq.comp_sdq_count++;
+		} else {
+			struct mlxsw_pci_queue *rdq;
+
+			rdq = mlxsw_pci_rdq_get(mlxsw_pci, dqn);
+			mlxsw_pci_cqe_rdq_handle(mlxsw_pci, rdq,
+						 wqe_counter, q->u.cq.v, ncqe);
+			q->u.cq.comp_rdq_count++;
+		}
+		if (++items == credits)
+			break;
+	}
+	if (items)
+		mlxsw_pci_queue_doorbell_arm_consumer_ring(mlxsw_pci, q);
+
+	napi_complete_done(napi, items);
+	return items;
+	//return budget;
+	// todo: handle budget
+}
+
 static void mlxsw_pci_cq_tasklet(struct tasklet_struct *t)
 {
 	struct mlxsw_pci_queue *q = from_tasklet(q, t, tasklet);
@@ -870,7 +918,7 @@ static void mlxsw_pci_eq_tasklet(struct tasklet_struct *t)
 		return;
 	for_each_set_bit(cqn, active_cqns, cq_count) {
 		q = mlxsw_pci_cq_get(mlxsw_pci, cqn);
-		mlxsw_pci_queue_tasklet_schedule(q);
+		napi_schedule(&q->napi);
 	}
 }
 
@@ -976,6 +1024,9 @@ static int mlxsw_pci_queue_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 	err = q_ops->init(mlxsw_pci, mbox, q);
 	if (err)
 		goto err_q_ops_init;
+
+	netif_napi_add(&mlxsw_pci->dummy_dev, &q->napi, mlxsw_pci_napi_poll);
+	napi_enable(&q->napi);
 	return 0;
 
 err_q_ops_init:
@@ -992,6 +1043,8 @@ static void mlxsw_pci_queue_fini(struct mlxsw_pci *mlxsw_pci,
 {
 	struct mlxsw_pci_mem_item *mem_item = &q->mem_item;
 
+	napi_disable(&q->napi);
+	netif_napi_del(&q->napi);
 	q_ops->fini(mlxsw_pci, q);
 	kfree(q->elem_info);
 	dma_free_coherent(&mlxsw_pci->pdev->dev, mem_item->size,
@@ -1639,6 +1692,8 @@ static int mlxsw_pci_init(void *bus_priv, struct mlxsw_core *mlxsw_core,
 	err = mlxsw_core_resources_query(mlxsw_core, mbox, res);
 	if (err)
 		goto err_requery_resources;
+
+	init_dummy_netdev(&mlxsw_pci->dummy_dev);
 
 	err = mlxsw_pci_aqs_init(mlxsw_pci, mbox);
 	if (err)
