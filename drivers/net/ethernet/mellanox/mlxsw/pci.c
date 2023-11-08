@@ -131,7 +131,8 @@ struct mlxsw_pci {
 	const struct pci_device_id *id;
 	enum mlxsw_pci_cqe_v max_cqe_ver; /* Maximal supported CQE version */
 	u8 num_sdq_cqs; /* Number of CQs used for SDQs */
-	struct net_device dummy_dev;
+	struct net_device dummy_dev_rx;
+	struct net_device dummy_dev_tx;
 };
 
 static void mlxsw_pci_queue_tasklet_schedule(struct mlxsw_pci_queue *q)
@@ -713,7 +714,7 @@ static char *mlxsw_pci_cq_sw_cqe_get(struct mlxsw_pci_queue *q)
 	return elem;
 }
 
-static int mlxsw_pci_napi_poll(struct napi_struct *napi, int budget)
+static int mlxsw_pci_napi_poll_rx(struct napi_struct *napi, int budget)
 {
 	struct mlxsw_pci_queue *q = container_of(napi, struct mlxsw_pci_queue,
 						 napi);
@@ -723,6 +724,7 @@ static int mlxsw_pci_napi_poll(struct napi_struct *napi, int budget)
 	int credits = budget;
 	//int credits = q->count >> 1;
 
+	printk("mlxsw_pci_napi_poll_rx, q_num = %d, sdq_num = %d\n", q->num, mlxsw_pci->num_sdq_cqs);
 	while ((cqe = mlxsw_pci_cq_sw_cqe_get(q))) {
 		u16 wqe_counter = mlxsw_pci_cqe_wqe_counter_get(cqe);
 		u8 sendq = mlxsw_pci_cqe_sr_get(q->u.cq.v, cqe);
@@ -732,6 +734,7 @@ static int mlxsw_pci_napi_poll(struct napi_struct *napi, int budget)
 		memcpy(ncqe, cqe, q->elem_size);
 		mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
 
+		printk("sendq = %d\n", sendq);
 		if (sendq) {
 			struct mlxsw_pci_queue *sdq;
 
@@ -1025,7 +1028,8 @@ static int mlxsw_pci_queue_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 	if (err)
 		goto err_q_ops_init;
 
-	netif_napi_add(&mlxsw_pci->dummy_dev, &q->napi, mlxsw_pci_napi_poll);
+	netif_napi_add(&mlxsw_pci->dummy_dev_rx, &q->napi, mlxsw_pci_napi_poll_rx);
+//	netif_napi_add(&mlxsw_pci->dummy_dev_tx, &q->napi, mlxsw_pci_napi_poll_tx);
 	napi_enable(&q->napi);
 	return 0;
 
@@ -1693,7 +1697,9 @@ static int mlxsw_pci_init(void *bus_priv, struct mlxsw_core *mlxsw_core,
 	if (err)
 		goto err_requery_resources;
 
-	init_dummy_netdev(&mlxsw_pci->dummy_dev);
+	init_dummy_netdev(&mlxsw_pci->dummy_dev_rx);
+	dev_set_threaded(&mlxsw_pci->dummy_dev_rx, true);
+	init_dummy_netdev(&mlxsw_pci->dummy_dev_tx);
 
 	err = mlxsw_pci_aqs_init(mlxsw_pci, mbox);
 	if (err)
