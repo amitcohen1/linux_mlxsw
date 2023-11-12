@@ -724,7 +724,6 @@ static int mlxsw_pci_napi_poll_rx(struct napi_struct *napi, int budget)
 	int credits = budget;
 	//int credits = q->count >> 1;
 
-	printk("mlxsw_pci_napi_poll_rx, q_num = %d, sdq_num = %d\n", q->num, mlxsw_pci->num_sdq_cqs);
 	while ((cqe = mlxsw_pci_cq_sw_cqe_get(q))) {
 		u16 wqe_counter = mlxsw_pci_cqe_wqe_counter_get(cqe);
 		u8 sendq = mlxsw_pci_cqe_sr_get(q->u.cq.v, cqe);
@@ -734,7 +733,6 @@ static int mlxsw_pci_napi_poll_rx(struct napi_struct *napi, int budget)
 		memcpy(ncqe, cqe, q->elem_size);
 		mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
 
-		printk("sendq = %d\n", sendq);
 		if (sendq) {
 			struct mlxsw_pci_queue *sdq;
 
