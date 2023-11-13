@@ -92,7 +92,8 @@ struct mlxsw_pci_queue {
 			u32 ev_other_count;
 		} eq;
 	} u;
-	struct napi_struct napi;
+	struct napi_struct napi_rx;
+	struct napi_struct napi_tx;
 };
 
 struct mlxsw_pci_queue_type_group {
@@ -717,7 +718,7 @@ static char *mlxsw_pci_cq_sw_cqe_get(struct mlxsw_pci_queue *q)
 static int mlxsw_pci_napi_poll_rx(struct napi_struct *napi, int budget)
 {
 	struct mlxsw_pci_queue *q = container_of(napi, struct mlxsw_pci_queue,
-						 napi);
+						 napi_rx);
 	struct mlxsw_pci *mlxsw_pci = q->pci;
 	char *cqe;
 	int items = 0;
@@ -725,29 +726,55 @@ static int mlxsw_pci_napi_poll_rx(struct napi_struct *napi, int budget)
 	//int credits = q->count >> 1;
 
 	while ((cqe = mlxsw_pci_cq_sw_cqe_get(q))) {
+		struct mlxsw_pci_queue *rdq;
 		u16 wqe_counter = mlxsw_pci_cqe_wqe_counter_get(cqe);
-		u8 sendq = mlxsw_pci_cqe_sr_get(q->u.cq.v, cqe);
 		u8 dqn = mlxsw_pci_cqe_dqn_get(q->u.cq.v, cqe);
 		char ncqe[MLXSW_PCI_CQE_SIZE_MAX];
 
 		memcpy(ncqe, cqe, q->elem_size);
 		mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
 
-		if (sendq) {
-			struct mlxsw_pci_queue *sdq;
+		rdq = mlxsw_pci_rdq_get(mlxsw_pci, dqn);
+		mlxsw_pci_cqe_rdq_handle(mlxsw_pci, rdq,
+					 wqe_counter, q->u.cq.v, ncqe);
+		q->u.cq.comp_rdq_count++;
 
-			sdq = mlxsw_pci_sdq_get(mlxsw_pci, dqn);
-			mlxsw_pci_cqe_sdq_handle(mlxsw_pci, sdq,
-						 wqe_counter, q->u.cq.v, ncqe);
-			q->u.cq.comp_sdq_count++;
-		} else {
-			struct mlxsw_pci_queue *rdq;
+		if (++items == credits)
+			break;
+	}
+	if (items)
+		mlxsw_pci_queue_doorbell_arm_consumer_ring(mlxsw_pci, q);
 
-			rdq = mlxsw_pci_rdq_get(mlxsw_pci, dqn);
-			mlxsw_pci_cqe_rdq_handle(mlxsw_pci, rdq,
-						 wqe_counter, q->u.cq.v, ncqe);
-			q->u.cq.comp_rdq_count++;
-		}
+	napi_complete_done(napi, items);
+	return items;
+	//return budget;
+	// todo: handle budget
+}
+
+static int mlxsw_pci_napi_poll_tx(struct napi_struct *napi, int budget)
+{
+	struct mlxsw_pci_queue *q = container_of(napi, struct mlxsw_pci_queue,
+						 napi_tx);
+	struct mlxsw_pci *mlxsw_pci = q->pci;
+	char *cqe;
+	int items = 0;
+	//int credits = budget;
+	int credits = q->count >> 1;
+
+	while ((cqe = mlxsw_pci_cq_sw_cqe_get(q))) {
+		struct mlxsw_pci_queue *sdq;
+		u16 wqe_counter = mlxsw_pci_cqe_wqe_counter_get(cqe);
+		u8 dqn = mlxsw_pci_cqe_dqn_get(q->u.cq.v, cqe);
+		char ncqe[MLXSW_PCI_CQE_SIZE_MAX];
+
+		memcpy(ncqe, cqe, q->elem_size);
+		mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
+
+		sdq = mlxsw_pci_sdq_get(mlxsw_pci, dqn);
+		mlxsw_pci_cqe_sdq_handle(mlxsw_pci, sdq,
+					 wqe_counter, q->u.cq.v, ncqe);
+		q->u.cq.comp_sdq_count++;
+
 		if (++items == credits)
 			break;
 	}
@@ -1026,9 +1053,14 @@ static int mlxsw_pci_queue_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 	if (err)
 		goto err_q_ops_init;
 
-	netif_napi_add(&mlxsw_pci->dummy_dev_rx, &q->napi, mlxsw_pci_napi_poll_rx);
-//	netif_napi_add(&mlxsw_pci->dummy_dev_tx, &q->napi, mlxsw_pci_napi_poll_tx);
-	napi_enable(&q->napi);
+	if (q->num >= 24) {
+		netif_napi_add(&mlxsw_pci->dummy_dev_rx, &q->napi_rx, mlxsw_pci_napi_poll_rx);
+		napi_enable(&q->napi_rx);
+	} else {
+		netif_napi_add(&mlxsw_pci->dummy_dev_tx, &q->napi_tx, mlxsw_pci_napi_poll_tx);
+		napi_enable(&q->napi_tx);
+	}
+
 	return 0;
 
 err_q_ops_init:
@@ -1045,8 +1077,14 @@ static void mlxsw_pci_queue_fini(struct mlxsw_pci *mlxsw_pci,
 {
 	struct mlxsw_pci_mem_item *mem_item = &q->mem_item;
 
-	napi_disable(&q->napi);
-	netif_napi_del(&q->napi);
+	if (q->num >= 24) {
+		napi_disable(&q->napi_rx);
+		netif_napi_del(&q->napi_rx);
+	} else {
+		napi_disable(&q->napi_tx);
+		netif_napi_del(&q->napi_tx);
+	}
+
 	q_ops->fini(mlxsw_pci, q);
 	kfree(q->elem_info);
 	dma_free_coherent(&mlxsw_pci->pdev->dev, mem_item->size,
