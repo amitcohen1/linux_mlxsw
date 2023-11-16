@@ -92,8 +92,7 @@ struct mlxsw_pci_queue {
 			u32 ev_other_count;
 		} eq;
 	} u;
-	struct napi_struct napi_rx;
-	struct napi_struct napi_tx;
+	struct napi_struct napi;
 };
 
 struct mlxsw_pci_queue_type_group {
@@ -471,6 +470,9 @@ static void mlxsw_pci_cq_pre_init(struct mlxsw_pci *mlxsw_pci,
 		q->u.cq.v = MLXSW_PCI_CQE_V1;
 }
 
+static int mlxsw_pci_napi_poll_rx(struct napi_struct *napi, int budget);
+static int mlxsw_pci_napi_poll_tx(struct napi_struct *napi, int budget);
+
 static int mlxsw_pci_cq_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 			     struct mlxsw_pci_queue *q)
 {
@@ -503,6 +505,15 @@ static int mlxsw_pci_cq_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 	err = mlxsw_cmd_sw2hw_cq(mlxsw_pci->core, mbox, q->num);
 	if (err)
 		return err;
+
+	if (q->num >= 24)
+		netif_napi_add(&mlxsw_pci->dummy_dev_rx, &q->napi,
+			       mlxsw_pci_napi_poll_rx);
+	else
+		netif_napi_add(&mlxsw_pci->dummy_dev_tx, &q->napi,
+			       mlxsw_pci_napi_poll_tx);
+	napi_enable(&q->napi);
+
 	mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
 	mlxsw_pci_queue_doorbell_arm_consumer_ring(mlxsw_pci, q);
 	return 0;
@@ -511,6 +522,8 @@ static int mlxsw_pci_cq_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 static void mlxsw_pci_cq_fini(struct mlxsw_pci *mlxsw_pci,
 			      struct mlxsw_pci_queue *q)
 {
+	napi_disable(&q->napi);
+	netif_napi_del(&q->napi);
 	mlxsw_cmd_hw2sw_cq(mlxsw_pci->core, q->num);
 }
 
@@ -718,7 +731,7 @@ static char *mlxsw_pci_cq_sw_cqe_get(struct mlxsw_pci_queue *q)
 static int mlxsw_pci_napi_poll_rx(struct napi_struct *napi, int budget)
 {
 	struct mlxsw_pci_queue *q = container_of(napi, struct mlxsw_pci_queue,
-						 napi_rx);
+						 napi);
 	struct mlxsw_pci *mlxsw_pci = q->pci;
 	char *cqe;
 	int items = 0;
@@ -754,7 +767,7 @@ static int mlxsw_pci_napi_poll_rx(struct napi_struct *napi, int budget)
 static int mlxsw_pci_napi_poll_tx(struct napi_struct *napi, int budget)
 {
 	struct mlxsw_pci_queue *q = container_of(napi, struct mlxsw_pci_queue,
-						 napi_tx);
+						 napi);
 	struct mlxsw_pci *mlxsw_pci = q->pci;
 	char *cqe;
 	int items = 0;
@@ -1053,14 +1066,6 @@ static int mlxsw_pci_queue_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 	if (err)
 		goto err_q_ops_init;
 
-	if (q->num >= 24) {
-		netif_napi_add(&mlxsw_pci->dummy_dev_rx, &q->napi_rx, mlxsw_pci_napi_poll_rx);
-		napi_enable(&q->napi_rx);
-	} else {
-		netif_napi_add(&mlxsw_pci->dummy_dev_tx, &q->napi_tx, mlxsw_pci_napi_poll_tx);
-		napi_enable(&q->napi_tx);
-	}
-
 	return 0;
 
 err_q_ops_init:
@@ -1076,14 +1081,6 @@ static void mlxsw_pci_queue_fini(struct mlxsw_pci *mlxsw_pci,
 				 struct mlxsw_pci_queue *q)
 {
 	struct mlxsw_pci_mem_item *mem_item = &q->mem_item;
-
-	if (q->num >= 24) {
-		napi_disable(&q->napi_rx);
-		netif_napi_del(&q->napi_rx);
-	} else {
-		napi_disable(&q->napi_tx);
-		netif_napi_del(&q->napi_tx);
-	}
 
 	q_ops->fini(mlxsw_pci, q);
 	kfree(q->elem_info);
