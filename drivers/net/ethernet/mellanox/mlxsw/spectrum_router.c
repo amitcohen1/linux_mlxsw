@@ -2406,7 +2406,7 @@ mlxsw_sp_router_neighs_update_interval_init(struct mlxsw_sp *mlxsw_sp)
 	mlxsw_sp->router->neighs_update.interval = jiffies_to_msecs(interval);
 }
 
-static void mlxsw_sp_router_neigh_ent_ipv4_process(struct mlxsw_sp *mlxsw_sp,
+/*static void mlxsw_sp_router_neigh_ent_ipv4_process(struct mlxsw_sp *mlxsw_sp,
 						   char *rauhtd_pl,
 						   int ent_index)
 {
@@ -2481,11 +2481,11 @@ static void mlxsw_sp_router_neigh_rec_ipv4_process(struct mlxsw_sp *mlxsw_sp,
 
 	num_entries = mlxsw_reg_rauhtd_ipv4_rec_num_entries_get(rauhtd_pl,
 								rec_index);
-	/* Hardware starts counting at 0, so add 1. */
-	num_entries++;
+	* Hardware starts counting at 0, so add 1. */
+//	num_entries++;
 
 	/* Each record consists of several neighbour entries. */
-	for (i = 0; i < num_entries; i++) {
+/*	for (i = 0; i < num_entries; i++) {
 		int ent_index;
 
 		ent_index = rec_index * MLXSW_REG_RAUHTD_IPV4_ENT_PER_REC + i;
@@ -2499,8 +2499,8 @@ static void mlxsw_sp_router_neigh_rec_ipv6_process(struct mlxsw_sp *mlxsw_sp,
 						   char *rauhtd_pl,
 						   int rec_index)
 {
-	/* One record contains one entry. */
-	mlxsw_sp_router_neigh_ent_ipv6_process(mlxsw_sp, rauhtd_pl,
+	* One record contains one entry. */
+/*	mlxsw_sp_router_neigh_ent_ipv6_process(mlxsw_sp, rauhtd_pl,
 					       rec_index);
 }
 
@@ -2539,6 +2539,7 @@ static bool mlxsw_sp_router_rauhtd_is_full(char *rauhtd_pl)
 	return false;
 }
 
+
 static int
 __mlxsw_sp_router_neighs_update_rauhtd(struct mlxsw_sp *mlxsw_sp,
 				       char *rauhtd_pl,
@@ -2547,8 +2548,8 @@ __mlxsw_sp_router_neighs_update_rauhtd(struct mlxsw_sp *mlxsw_sp,
 	int i, num_rec;
 	int err;
 
-	/* Ensure the RIF we read from the device does not change mid-dump. */
-	mutex_lock(&mlxsw_sp->router->lock);
+	* Ensure the RIF we read from the device does not change mid-dump. */
+/*	mutex_lock(&mlxsw_sp->router->lock);
 	do {
 		mlxsw_reg_rauhtd_pack(rauhtd_pl, type);
 		err = mlxsw_reg_query(mlxsw_sp->core, MLXSW_REG(rauhtd),
@@ -2599,13 +2600,15 @@ static void mlxsw_sp_router_neighs_update_nh(struct mlxsw_sp *mlxsw_sp)
 	mutex_lock(&mlxsw_sp->router->lock);
 	list_for_each_entry(neigh_entry, &mlxsw_sp->router->nexthop_neighs_list,
 			    nexthop_neighs_list_node)
-		/* If this neigh have nexthops, make the kernel think this neigh
+		* If this neigh have nexthops, make the kernel think this neigh
 		 * is active regardless of the traffic.
 		 */
-		neigh_event_send(neigh_entry->key.n, NULL);
+/*		neigh_event_send(neigh_entry->key.n, NULL);
 	mutex_unlock(&mlxsw_sp->router->lock);
 }
+*/
 
+/*
 static void
 mlxsw_sp_router_neighs_update_work_schedule(struct mlxsw_sp *mlxsw_sp)
 {
@@ -2614,8 +2617,9 @@ mlxsw_sp_router_neighs_update_work_schedule(struct mlxsw_sp *mlxsw_sp)
 	mlxsw_core_schedule_dw(&mlxsw_sp->router->neighs_update.dw,
 			       msecs_to_jiffies(interval));
 }
+*/
 
-static void mlxsw_sp_router_neighs_update_work(struct work_struct *work)
+/*static void mlxsw_sp_router_neighs_update_work(struct work_struct *work)
 {
 	struct mlxsw_sp_router *router;
 	int err;
@@ -2628,8 +2632,9 @@ static void mlxsw_sp_router_neighs_update_work(struct work_struct *work)
 
 	mlxsw_sp_router_neighs_update_nh(router->mlxsw_sp);
 
-	mlxsw_sp_router_neighs_update_work_schedule(router->mlxsw_sp);
+	//mlxsw_sp_router_neighs_update_work_schedule(router->mlxsw_sp);
 }
+*/
 
 static void mlxsw_sp_router_probe_unresolved_nexthops(struct work_struct *work)
 {
@@ -2955,19 +2960,19 @@ static int mlxsw_sp_neigh_init(struct mlxsw_sp *mlxsw_sp)
 	mlxsw_sp_router_neighs_update_interval_init(mlxsw_sp);
 
 	/* Create the delayed works for the activity_update */
-	INIT_DELAYED_WORK(&mlxsw_sp->router->neighs_update.dw,
-			  mlxsw_sp_router_neighs_update_work);
+//	INIT_DELAYED_WORK(&mlxsw_sp->router->neighs_update.dw,
+//			  mlxsw_sp_router_neighs_update_work);
 	INIT_DELAYED_WORK(&mlxsw_sp->router->nexthop_probe_dw,
 			  mlxsw_sp_router_probe_unresolved_nexthops);
 	atomic_set(&mlxsw_sp->router->neighs_update.neigh_count, 0);
-	mlxsw_core_schedule_dw(&mlxsw_sp->router->neighs_update.dw, 0);
+//	mlxsw_core_schedule_dw(&mlxsw_sp->router->neighs_update.dw, 0);
 	mlxsw_core_schedule_dw(&mlxsw_sp->router->nexthop_probe_dw, 0);
 	return 0;
 }
 
 static void mlxsw_sp_neigh_fini(struct mlxsw_sp *mlxsw_sp)
 {
-	cancel_delayed_work_sync(&mlxsw_sp->router->neighs_update.dw);
+//	cancel_delayed_work_sync(&mlxsw_sp->router->neighs_update.dw);
 	cancel_delayed_work_sync(&mlxsw_sp->router->nexthop_probe_dw);
 	rhashtable_destroy(&mlxsw_sp->router->neigh_ht);
 }
