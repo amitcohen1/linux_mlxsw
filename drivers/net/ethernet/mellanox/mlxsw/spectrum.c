@@ -894,7 +894,7 @@ int mlxsw_sp_port_get_stats_raw(struct net_device *dev, int grp,
 	return mlxsw_reg_query(mlxsw_sp->core, MLXSW_REG(ppcnt), ppcnt_pl);
 }
 
-static int mlxsw_sp_port_get_hw_stats(struct net_device *dev,
+/*static int mlxsw_sp_port_get_hw_stats(struct net_device *dev,
 				      struct rtnl_link_stats64 *stats)
 {
 	char ppcnt_pl[MLXSW_REG_PPCNT_LEN];
@@ -986,10 +986,10 @@ static void update_stats_cache(struct work_struct *work)
 			     periodic_hw_stats.update_dw.work);
 
 	if (!netif_carrier_ok(mlxsw_sp_port->dev))
-		/* Note: mlxsw_sp_port_down_wipe_counters() clears the cache as
+		* Note: mlxsw_sp_port_down_wipe_counters() clears the cache as
 		 * necessary when port goes down.
 		 */
-		goto out;
+/*		goto out;
 
 	mlxsw_sp_port_get_hw_stats(mlxsw_sp_port->dev,
 				   &mlxsw_sp_port->periodic_hw_stats.stats);
@@ -1000,6 +1000,7 @@ out:
 	mlxsw_core_schedule_dw(&mlxsw_sp_port->periodic_hw_stats.update_dw,
 			       MLXSW_HW_STATS_UPDATE_TIME);
 }
+*/
 
 /* Return the stats from a cache that is updated periodically,
  * as this function might get called in an atomic context.
@@ -1676,8 +1677,8 @@ static int mlxsw_sp_port_create(struct mlxsw_sp *mlxsw_sp, u16 local_port,
 		goto err_alloc_stats;
 	}
 
-	INIT_DELAYED_WORK(&mlxsw_sp_port->periodic_hw_stats.update_dw,
-			  &update_stats_cache);
+//	INIT_DELAYED_WORK(&mlxsw_sp_port->periodic_hw_stats.update_dw,
+//			  &update_stats_cache);
 
 	dev->netdev_ops = &mlxsw_sp_port_netdev_ops;
 	dev->ethtool_ops = &mlxsw_sp_port_ethtool_ops;
@@ -1848,7 +1849,7 @@ static int mlxsw_sp_port_create(struct mlxsw_sp *mlxsw_sp, u16 local_port,
 		goto err_register_netdev;
 	}
 
-	mlxsw_core_schedule_dw(&mlxsw_sp_port->periodic_hw_stats.update_dw, 0);
+//	mlxsw_core_schedule_dw(&mlxsw_sp_port->periodic_hw_stats.update_dw, 0);
 	return 0;
 
 err_register_netdev:
@@ -1902,7 +1903,7 @@ static void mlxsw_sp_port_remove(struct mlxsw_sp *mlxsw_sp, u16 local_port)
 	u8 slot_index = mlxsw_sp_port->mapping.slot_index;
 	u8 module = mlxsw_sp_port->mapping.module;
 
-	cancel_delayed_work_sync(&mlxsw_sp_port->periodic_hw_stats.update_dw);
+//	cancel_delayed_work_sync(&mlxsw_sp_port->periodic_hw_stats.update_dw);
 	cancel_delayed_work_sync(&mlxsw_sp_port->ptp.shaper_dw);
 	unregister_netdev(mlxsw_sp_port->dev); /* This calls ndo_stop */
 	mlxsw_sp_port_ptp_clear(mlxsw_sp_port);
