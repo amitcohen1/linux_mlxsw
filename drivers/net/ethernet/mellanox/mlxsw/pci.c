@@ -708,8 +708,23 @@ static void mlxsw_pci_cqe_rdq_handle(struct mlxsw_pci *mlxsw_pci,
 out:
 	/* Everything is set up, ring doorbell to pass elem to HW */
 	q->producer_counter++;
-	mlxsw_pci_queue_doorbell_producer_ring(mlxsw_pci, q);
+//	mlxsw_pci_queue_doorbell_producer_ring(mlxsw_pci, q);
 	return;
+}
+
+static bool mlxsw_pci_cq_sw_cqe_available(struct mlxsw_pci_queue *q)
+{
+	struct mlxsw_pci_queue_elem_info *elem_info;
+	char *elem;
+	bool owner_bit;
+
+	elem_info = mlxsw_pci_queue_elem_info_consumer_get(q);
+	elem = elem_info->elem;
+	owner_bit = mlxsw_pci_cqe_owner_get(q->u.cq.v, elem);
+	if (mlxsw_pci_elem_hw_owned(q, owner_bit))
+		return false;
+
+	return true;
 }
 
 static char *mlxsw_pci_cq_sw_cqe_get(struct mlxsw_pci_queue *q)
@@ -733,19 +748,21 @@ static int mlxsw_pci_napi_poll_rx(struct napi_struct *napi, int budget)
 	struct mlxsw_pci_queue *q = container_of(napi, struct mlxsw_pci_queue,
 						 napi);
 	struct mlxsw_pci *mlxsw_pci = q->pci;
+	struct mlxsw_pci_queue *rdq;
 	char *cqe;
 	int items = 0;
 	int credits = budget;
+	int work_done;
+	u8 dqn;
 	//int credits = q->count >> 1;
 
 	while ((cqe = mlxsw_pci_cq_sw_cqe_get(q))) {
-		struct mlxsw_pci_queue *rdq;
 		u16 wqe_counter = mlxsw_pci_cqe_wqe_counter_get(cqe);
-		u8 dqn = mlxsw_pci_cqe_dqn_get(q->u.cq.v, cqe);
+		dqn = mlxsw_pci_cqe_dqn_get(q->u.cq.v, cqe);
 		char ncqe[MLXSW_PCI_CQE_SIZE_MAX];
 
 		memcpy(ncqe, cqe, q->elem_size);
-		mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
+//		mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
 
 		rdq = mlxsw_pci_rdq_get(mlxsw_pci, dqn);
 		mlxsw_pci_cqe_rdq_handle(mlxsw_pci, rdq,
@@ -755,11 +772,28 @@ static int mlxsw_pci_napi_poll_rx(struct napi_struct *napi, int budget)
 		if (++items == credits)
 			break;
 	}
-	if (items)
-		mlxsw_pci_queue_doorbell_arm_consumer_ring(mlxsw_pci, q);
 
-	napi_complete_done(napi, items);
-	return items;
+	if (!items)
+		return 0;
+
+
+	mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
+	rdq = mlxsw_pci_rdq_get(mlxsw_pci, dqn);
+	mlxsw_pci_queue_doorbell_producer_ring(mlxsw_pci, rdq);
+
+	if (items < budget) {
+		work_done = items;
+		mlxsw_pci_queue_doorbell_arm_consumer_ring(mlxsw_pci, q);
+		napi_complete_done(napi, items);
+	} else if (!mlxsw_pci_cq_sw_cqe_available(q)) {
+		work_done = budget -1;
+		mlxsw_pci_queue_doorbell_arm_consumer_ring(mlxsw_pci, q);
+		napi_complete_done(napi, items);
+	} else {
+		work_done = items;
+	}
+
+	return work_done;
 	//return budget;
 	// todo: handle budget
 }
