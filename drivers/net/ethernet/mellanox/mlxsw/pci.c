@@ -472,6 +472,7 @@ static void mlxsw_pci_cq_pre_init(struct mlxsw_pci *mlxsw_pci,
 
 static int mlxsw_pci_napi_poll_rx(struct napi_struct *napi, int budget);
 static int mlxsw_pci_napi_poll_tx(struct napi_struct *napi, int budget);
+static void mlxsw_pci_cq_tasklet(struct tasklet_struct *t);
 
 static int mlxsw_pci_cq_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 			     struct mlxsw_pci_queue *q)
@@ -514,6 +515,7 @@ static int mlxsw_pci_cq_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 			       mlxsw_pci_napi_poll_tx);
 	napi_enable(&q->napi);
 
+	tasklet_setup(&q->tasklet, mlxsw_pci_cq_tasklet);
 	mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
 	mlxsw_pci_queue_doorbell_arm_consumer_ring(mlxsw_pci, q);
 	return 0;
@@ -873,6 +875,58 @@ static void mlxsw_pci_cq_tasklet(struct tasklet_struct *t)
 		mlxsw_pci_queue_doorbell_arm_consumer_ring(mlxsw_pci, q);
 }
 
+static void mlxsw_pci_cq_rx_tasklet(struct tasklet_struct *t)
+{
+	printk("1\n");
+}
+
+static void mlxsw_pci_cq_tx_tasklet(struct tasklet_struct *t)
+{
+	printk("1\n");
+}
+
+static void mlxsw_pci_cq_tasklet_setup(struct mlxsw_pci_queue *q)
+{
+	struct mlxsw_pci *mlxsw_pci = q->pci;
+	u8 sdq_count;
+
+	sdq_count = mlxsw_pci_sdq_count(mlxsw_pci);
+	if (q->num > sdq_count)
+		tasklet_setup(&q->tasklet, mlxsw_pci_cq_rx_tasklet);
+	else
+		tasklet_setup(&q->tasklet, mlxsw_pci_cq_tx_tasklet);
+}
+
+static void mlxsw_pci_eq_eq0_tasklet(struct tasklet_struct *t)
+{
+	printk("1\n");
+}
+
+static void mlxsw_pci_eq_eq1_tasklet(struct tasklet_struct *t)
+{
+	printk("1\n");
+}
+
+static void mlxsw_pci_eq_other_tasklet(struct tasklet_struct *t)
+{
+	printk("1\n");
+}
+
+static void mlxsw_pci_eq_tasklet_setup(struct mlxsw_pci_queue *q)
+{
+	switch (q->num) {
+	case MLXSW_PCI_EQ_ASYNC_NUM:
+		tasklet_setup(&q->tasklet, mlxsw_pci_eq_eq0_tasklet);
+		break;
+	case MLXSW_PCI_EQ_COMP_NUM:
+		tasklet_setup(&q->tasklet, mlxsw_pci_eq_eq1_tasklet);
+		break;
+	default:
+		tasklet_setup(&q->tasklet, mlxsw_pci_eq_other_tasklet);
+		break;
+	}
+}
+
 static u16 mlxsw_pci_cq_elem_count(const struct mlxsw_pci_queue *q)
 {
 	return q->u.cq.v == MLXSW_PCI_CQE_V2 ? MLXSW_PCI_CQE2_COUNT :
@@ -884,6 +938,8 @@ static u8 mlxsw_pci_cq_elem_size(const struct mlxsw_pci_queue *q)
 	return q->u.cq.v == MLXSW_PCI_CQE_V2 ? MLXSW_PCI_CQE2_SIZE :
 					       MLXSW_PCI_CQE01_SIZE;
 }
+
+static void mlxsw_pci_eq_tasklet(struct tasklet_struct *t);
 
 static int mlxsw_pci_eq_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 			     struct mlxsw_pci_queue *q)
@@ -910,6 +966,8 @@ static int mlxsw_pci_eq_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 	err = mlxsw_cmd_sw2hw_eq(mlxsw_pci->core, mbox, q->num);
 	if (err)
 		return err;
+
+	tasklet_setup(&q->tasklet, mlxsw_pci_eq_tasklet);
 	mlxsw_pci_queue_doorbell_consumer_ring(mlxsw_pci, q);
 	mlxsw_pci_queue_doorbell_arm_consumer_ring(mlxsw_pci, q);
 	return 0;
@@ -1007,6 +1065,7 @@ struct mlxsw_pci_queue_ops {
 	void (*fini)(struct mlxsw_pci *mlxsw_pci,
 		     struct mlxsw_pci_queue *q);
 	void (*tasklet)(struct tasklet_struct *t);
+	void (*tasklet_setup)(struct mlxsw_pci_queue *q);
 	u16 (*elem_count_f)(const struct mlxsw_pci_queue *q);
 	u8 (*elem_size_f)(const struct mlxsw_pci_queue *q);
 	u16 elem_count;
@@ -1035,6 +1094,7 @@ static const struct mlxsw_pci_queue_ops mlxsw_pci_cq_ops = {
 	.init		= mlxsw_pci_cq_init,
 	.fini		= mlxsw_pci_cq_fini,
 	.tasklet	= mlxsw_pci_cq_tasklet,
+	.tasklet_setup	= mlxsw_pci_cq_tasklet_setup,
 	.elem_count_f	= mlxsw_pci_cq_elem_count,
 	.elem_size_f	= mlxsw_pci_cq_elem_size
 };
@@ -1044,6 +1104,7 @@ static const struct mlxsw_pci_queue_ops mlxsw_pci_eq_ops = {
 	.init		= mlxsw_pci_eq_init,
 	.fini		= mlxsw_pci_eq_fini,
 	.tasklet	= mlxsw_pci_eq_tasklet,
+	.tasklet_setup	= mlxsw_pci_eq_tasklet_setup,
 	.elem_count	= MLXSW_PCI_EQE_COUNT,
 	.elem_size	= MLXSW_PCI_EQE_SIZE
 };
@@ -1068,8 +1129,9 @@ static int mlxsw_pci_queue_init(struct mlxsw_pci *mlxsw_pci, char *mbox,
 	q->type = q_ops->type;
 	q->pci = mlxsw_pci;
 
-	if (q_ops->tasklet)
-		tasklet_setup(&q->tasklet, q_ops->tasklet);
+	// if (q_ops->tasklet_setup)
+//	if (q_ops->tasklet)
+//		tasklet_setup(&q->tasklet, q_ops->tasklet);
 
 	mem_item->size = MLXSW_PCI_AQ_SIZE;
 	mem_item->buf = dma_alloc_coherent(&mlxsw_pci->pdev->dev,
