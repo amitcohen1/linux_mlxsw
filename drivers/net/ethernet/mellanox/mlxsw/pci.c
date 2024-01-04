@@ -127,7 +127,28 @@ struct mlxsw_pci {
 	u8 num_cqs; /* Number of CQs */
 	u8 num_sdqs; /* Number of SDQs */
 	bool skip_reset;
+	struct net_device napi_dev_tx;
+	struct net_device napi_dev_rx;
 };
+
+static int mlxsw_pci_napi_devs_init(struct mlxsw_pci *mlxsw_pci)
+{
+	int err;
+
+	err = init_dummy_netdev(&mlxsw_pci->napi_dev_tx);
+	if (err)
+		return err;
+
+	err = init_dummy_netdev(&mlxsw_pci->napi_dev_rx);
+	if (err)
+		return err;
+
+	err = dev_set_threaded(&mlxsw_pci->napi_dev_rx, true);
+	if (err)
+		return err;
+
+	return 0;
+}
 
 static void mlxsw_pci_queue_tasklet_schedule(struct mlxsw_pci_queue *q)
 {
@@ -1726,6 +1747,10 @@ static int mlxsw_pci_init(void *bus_priv, struct mlxsw_core *mlxsw_core,
 	if (err)
 		goto err_requery_resources;
 
+	err = mlxsw_pci_napi_devs_init(mlxsw_pci);
+	if (err)
+		goto err_dummy_devs_init;
+
 	err = mlxsw_pci_aqs_init(mlxsw_pci, mbox);
 	if (err)
 		goto err_aqs_init;
@@ -1743,6 +1768,7 @@ static int mlxsw_pci_init(void *bus_priv, struct mlxsw_core *mlxsw_core,
 err_request_eq_irq:
 	mlxsw_pci_aqs_fini(mlxsw_pci);
 err_aqs_init:
+err_dummy_devs_init:
 err_requery_resources:
 err_config_profile:
 err_cqe_v_check:
