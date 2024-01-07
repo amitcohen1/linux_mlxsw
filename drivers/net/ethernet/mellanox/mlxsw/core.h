@@ -100,7 +100,6 @@ void mlxsw_core_ptp_transmitted(struct mlxsw_core *mlxsw_core,
 
 struct mlxsw_rx_listener {
 	void (*func)(struct sk_buff *skb, u16 local_port, void *priv);
-	u16 local_port;
 	u8 mirror_reason;
 	u16 trap_id;
 };
@@ -136,7 +135,6 @@ struct mlxsw_listener {
 		.rx_listener =							\
 		{								\
 			.func = _func,						\
-			.local_port = MLXSW_PORT_DONT_CARE,			\
 			.mirror_reason = _mirror_reason,			\
 			.trap_id = MLXSW_TRAP_ID_##_trap_id,			\
 		},								\

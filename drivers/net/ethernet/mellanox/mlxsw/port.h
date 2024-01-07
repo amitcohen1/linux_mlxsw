@@ -20,8 +20,6 @@
 
 #define MLXSW_PORT_CPU_PORT		0x0
 
-#define MLXSW_PORT_DONT_CARE		0xFF
-
 enum mlxsw_port_admin_status {
 	MLXSW_PORT_ADMIN_STATUS_UP = 1,
 	MLXSW_PORT_ADMIN_STATUS_DOWN = 2,

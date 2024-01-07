@@ -2351,7 +2351,6 @@ static bool __is_rx_listener_equal(const struct mlxsw_rx_listener *rxl_a,
 				   const struct mlxsw_rx_listener *rxl_b)
 {
 	return (rxl_a->func == rxl_b->func &&
-		rxl_a->local_port == rxl_b->local_port &&
 		rxl_a->trap_id == rxl_b->trap_id &&
 		rxl_a->mirror_reason == rxl_b->mirror_reason);
 }
@@ -2470,7 +2469,6 @@ int mlxsw_core_event_listener_register(struct mlxsw_core *mlxsw_core,
 	struct mlxsw_event_listener_item *el_item;
 	const struct mlxsw_rx_listener rxl = {
 		.func = mlxsw_core_event_listener_func,
-		.local_port = MLXSW_PORT_DONT_CARE,
 		.trap_id = el->trap_id,
 	};
 
@@ -2507,7 +2505,6 @@ void mlxsw_core_event_listener_unregister(struct mlxsw_core *mlxsw_core,
 	struct mlxsw_event_listener_item *el_item;
 	const struct mlxsw_rx_listener rxl = {
 		.func = mlxsw_core_event_listener_func,
-		.local_port = MLXSW_PORT_DONT_CARE,
 		.trap_id = el->trap_id,
 	};
 
@@ -2973,9 +2970,7 @@ void mlxsw_core_skb_receive(struct mlxsw_core *mlxsw_core, struct sk_buff *skb,
 	rcu_read_lock();
 	list_for_each_entry_rcu(rxl_item, &mlxsw_core->rx_listener_list, list) {
 		rxl = &rxl_item->rxl;
-		if ((rxl->local_port == MLXSW_PORT_DONT_CARE ||
-		     rxl->local_port == local_port) &&
-		    rxl->trap_id == rx_info->trap_id &&
+		if (rxl->trap_id == rx_info->trap_id &&
 		    rxl->mirror_reason == rx_info->mirror_reason) {
 			if (rxl_item->enabled)
 				found = true;
