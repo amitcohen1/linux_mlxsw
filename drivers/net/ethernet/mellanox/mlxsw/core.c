@@ -21,6 +21,7 @@
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 #include <linux/firmware.h>
+#include <linux/rhashtable.h>
 #include <asm/byteorder.h>
 #include <net/devlink.h>
 #include <trace/events/devlink.h>
@@ -68,7 +69,7 @@ struct mlxsw_core {
 	void *bus_priv;
 	const struct mlxsw_bus_info *bus_info;
 	struct workqueue_struct *emad_wq;
-	struct list_head rx_listener_list;
+	struct rhashtable rx_listener_ht;
 	struct list_head event_listener_list;
 	struct list_head irq_event_handler_list;
 	struct mutex irq_event_handler_lock; /* Locks access to handlers list */
@@ -234,8 +235,14 @@ mlxsw_core_fw_rev_minor_subminor_validate(const struct mlxsw_fw_rev *rev,
 }
 EXPORT_SYMBOL(mlxsw_core_fw_rev_minor_subminor_validate);
 
+struct mlxsw_rx_listener_item_key {
+	u8 mirror_reason;
+	u16 trap_id;
+};
+
 struct mlxsw_rx_listener_item {
-	struct list_head list;
+	struct rhash_head ht_node;
+	struct mlxsw_rx_listener_item_key key;
 	struct mlxsw_rx_listener rxl;
 	void *priv;
 	bool enabled;
@@ -2093,6 +2100,12 @@ static void mlxsw_core_irq_event_handler_fini(struct mlxsw_core *mlxsw_core)
 	WARN_ON(!list_empty(&mlxsw_core->irq_event_handler_list));
 }
 
+static const struct rhashtable_params mlxsw_rx_listener_ht_params = {
+	.key_offset = offsetof(struct mlxsw_rx_listener_item, key),
+	.head_offset = offsetof(struct mlxsw_rx_listener_item, ht_node),
+	.key_len = sizeof(struct mlxsw_rx_listener_item_key),
+};
+
 static int
 __mlxsw_core_bus_device_register(const struct mlxsw_bus_info *mlxsw_bus_info,
 				 const struct mlxsw_bus *mlxsw_bus,
@@ -2124,7 +2137,10 @@ __mlxsw_core_bus_device_register(const struct mlxsw_bus_info *mlxsw_bus_info,
 	}
 
 	mlxsw_core = devlink_priv(devlink);
-	INIT_LIST_HEAD(&mlxsw_core->rx_listener_list);
+	err = rhashtable_init(&mlxsw_core->rx_listener_ht,
+			      &mlxsw_rx_listener_ht_params);
+	if (err)
+		goto err_rhashtable_init;
 	INIT_LIST_HEAD(&mlxsw_core->event_listener_list);
 	mlxsw_core->driver = mlxsw_driver;
 	mlxsw_core->bus = mlxsw_bus;
@@ -2236,6 +2252,8 @@ err_register_resources:
 	mlxsw_bus->fini(bus_priv);
 err_bus_init:
 	mlxsw_core_irq_event_handler_fini(mlxsw_core);
+	rhashtable_destroy(&mlxsw_core->rx_listener_ht);
+err_rhashtable_init:
 	if (!reload) {
 		devl_unregister(devlink);
 		devl_unlock(devlink);
@@ -2305,6 +2323,7 @@ void mlxsw_core_bus_device_unregister(struct mlxsw_core *mlxsw_core,
 		devl_resources_unregister(devlink);
 	mlxsw_core->bus->fini(mlxsw_core->bus_priv);
 	mlxsw_core_irq_event_handler_fini(mlxsw_core);
+	rhashtable_destroy(&mlxsw_core->rx_listener_ht);
 	if (!reload) {
 		devl_unregister(devlink);
 		devl_unlock(devlink);
@@ -2347,25 +2366,17 @@ void mlxsw_core_ptp_transmitted(struct mlxsw_core *mlxsw_core,
 }
 EXPORT_SYMBOL(mlxsw_core_ptp_transmitted);
 
-static bool __is_rx_listener_equal(const struct mlxsw_rx_listener *rxl_a,
-				   const struct mlxsw_rx_listener *rxl_b)
-{
-	return (rxl_a->func == rxl_b->func &&
-		rxl_a->trap_id == rxl_b->trap_id &&
-		rxl_a->mirror_reason == rxl_b->mirror_reason);
-}
-
 static struct mlxsw_rx_listener_item *
-__find_rx_listener_item(struct mlxsw_core *mlxsw_core,
-			const struct mlxsw_rx_listener *rxl)
+mlxsw_core_rx_listener_item_lookup(struct mlxsw_core *mlxsw_core,
+				   u8 mirror_reason, u16 trap_id)
 {
-	struct mlxsw_rx_listener_item *rxl_item;
+	struct mlxsw_rx_listener_item_key key = {
+		.mirror_reason = mirror_reason,
+		.trap_id = trap_id,
+	};
 
-	list_for_each_entry(rxl_item, &mlxsw_core->rx_listener_list, list) {
-		if (__is_rx_listener_equal(&rxl_item->rxl, rxl))
-			return rxl_item;
-	}
-	return NULL;
+	return rhashtable_lookup_fast(&mlxsw_core->rx_listener_ht, &key,
+				      mlxsw_rx_listener_ht_params);
 }
 
 int mlxsw_core_rx_listener_register(struct mlxsw_core *mlxsw_core,
@@ -2373,19 +2384,33 @@ int mlxsw_core_rx_listener_register(struct mlxsw_core *mlxsw_core,
 				    void *priv, bool enabled)
 {
 	struct mlxsw_rx_listener_item *rxl_item;
+	int err;
 
-	rxl_item = __find_rx_listener_item(mlxsw_core, rxl);
+	rxl_item = mlxsw_core_rx_listener_item_lookup(mlxsw_core,
+						      rxl->mirror_reason,
+						      rxl->trap_id);
 	if (rxl_item)
 		return -EEXIST;
-	rxl_item = kmalloc(sizeof(*rxl_item), GFP_KERNEL);
+	rxl_item = kzalloc(sizeof(*rxl_item), GFP_KERNEL);
 	if (!rxl_item)
 		return -ENOMEM;
+	rxl_item->key.mirror_reason = rxl->mirror_reason;
+	rxl_item->key.trap_id = rxl->trap_id;
 	rxl_item->rxl = *rxl;
 	rxl_item->priv = priv;
 	rxl_item->enabled = enabled;
 
-	list_add_rcu(&rxl_item->list, &mlxsw_core->rx_listener_list);
+	err = rhashtable_insert_fast(&mlxsw_core->rx_listener_ht,
+				     &rxl_item->ht_node,
+				     mlxsw_rx_listener_ht_params);
+	if (err)
+		goto err_rhashtable_insert;
+
 	return 0;
+
+err_rhashtable_insert:
+	kfree(rxl_item);
+	return err;
 }
 EXPORT_SYMBOL(mlxsw_core_rx_listener_register);
 
@@ -2394,10 +2419,13 @@ void mlxsw_core_rx_listener_unregister(struct mlxsw_core *mlxsw_core,
 {
 	struct mlxsw_rx_listener_item *rxl_item;
 
-	rxl_item = __find_rx_listener_item(mlxsw_core, rxl);
+	rxl_item = mlxsw_core_rx_listener_item_lookup(mlxsw_core,
+						      rxl->mirror_reason,
+						      rxl->trap_id);
 	if (!rxl_item)
 		return;
-	list_del_rcu(&rxl_item->list);
+	rhashtable_remove_fast(&mlxsw_core->rx_listener_ht, &rxl_item->ht_node,
+			       mlxsw_rx_listener_ht_params);
 	synchronize_rcu();
 	kfree(rxl_item);
 }
@@ -2410,7 +2438,9 @@ mlxsw_core_rx_listener_state_set(struct mlxsw_core *mlxsw_core,
 {
 	struct mlxsw_rx_listener_item *rxl_item;
 
-	rxl_item = __find_rx_listener_item(mlxsw_core, rxl);
+	rxl_item = mlxsw_core_rx_listener_item_lookup(mlxsw_core,
+						      rxl->mirror_reason,
+						      rxl->trap_id);
 	if (WARN_ON(!rxl_item))
 		return;
 	rxl_item->enabled = enabled;
@@ -2944,7 +2974,6 @@ void mlxsw_core_skb_receive(struct mlxsw_core *mlxsw_core, struct sk_buff *skb,
 	struct mlxsw_rx_listener_item *rxl_item;
 	const struct mlxsw_rx_listener *rxl;
 	u16 local_port;
-	bool found = false;
 
 	if (rx_info->is_lag) {
 		dev_dbg_ratelimited(mlxsw_core->bus_info->dev, "%s: lag_id = %d, lag_port_index = 0x%x\n",
@@ -2968,20 +2997,15 @@ void mlxsw_core_skb_receive(struct mlxsw_core *mlxsw_core, struct sk_buff *skb,
 		goto drop;
 
 	rcu_read_lock();
-	list_for_each_entry_rcu(rxl_item, &mlxsw_core->rx_listener_list, list) {
-		rxl = &rxl_item->rxl;
-		if (rxl->trap_id == rx_info->trap_id &&
-		    rxl->mirror_reason == rx_info->mirror_reason) {
-			if (rxl_item->enabled)
-				found = true;
-			break;
-		}
-	}
-	if (!found) {
+	rxl_item = mlxsw_core_rx_listener_item_lookup(mlxsw_core,
+						      rx_info->mirror_reason,
+						      rx_info->trap_id);
+	if (!rxl_item || !rxl_item->enabled) {
 		rcu_read_unlock();
 		goto drop;
 	}
 
+	rxl = &rxl_item->rxl;
 	rxl->func(skb, local_port, rxl_item->priv);
 	rcu_read_unlock();
 	return;
